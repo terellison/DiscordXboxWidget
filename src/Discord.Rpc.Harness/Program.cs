@@ -35,8 +35,12 @@ try
             await WatchAsync(RequireClientId(args), cts.Token);
             break;
 
+        case "toggle":
+            await ToggleAsync(RequireClientId(args), cts.Token);
+            break;
+
         default:
-            Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | handshake | watch");
+            Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | wsprobe | handshake | watch | toggle");
             return 2;
     }
 
@@ -170,6 +174,45 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
     await session.ConnectAsync(ct);
     Console.WriteLine("Watching. Ctrl+C to stop.");
     await Task.Delay(Timeout.Infinite, ct);
+}
+
+// The only mode that writes to Discord. Every other mode is read-only, so this is the
+// first exercise of SET_VOICE_SETTINGS -- worth proving here rather than inside a Game Bar
+// widget, where attaching a debugger is considerably more painful.
+static async Task ToggleAsync(string clientId, CancellationToken ct)
+{
+    using var session = new DiscordRpcSession(clientId, new ConsoleTokenProvider(clientId));
+    await session.ConnectAsync(ct);
+
+    if (!session.Capabilities.HasFlag(SessionCapabilities.SetVoiceState))
+    {
+        Console.WriteLine("SetVoiceState not granted; cannot write voice settings.");
+        return;
+    }
+
+    var original = await session.GetVoiceSettingsAsync(ct);
+    Console.WriteLine($"[before]  muted={original.IsMuted} deafened={original.IsDeafened}");
+
+    var target = !original.IsMuted;
+    try
+    {
+        await session.SetMutedAsync(target, ct);
+
+        // Read back rather than trusting the command's success response: this proves
+        // Discord applied the change, not merely that it accepted the frame.
+        var after = await session.GetVoiceSettingsAsync(ct);
+        Console.WriteLine($"[set]     muted={after.IsMuted} (wanted {target})");
+        Console.WriteLine(after.IsMuted == target
+            ? "[ok]      write took effect"
+            : "[FAIL]    Discord accepted the command but state did not change");
+    }
+    finally
+    {
+        // Always hand the mic back the way we found it, even if the read-back threw.
+        await session.SetMutedAsync(original.IsMuted, CancellationToken.None);
+        var restored = await session.GetVoiceSettingsAsync(CancellationToken.None);
+        Console.WriteLine($"[restore] muted={restored.IsMuted}");
+    }
 }
 
 /// <summary>
