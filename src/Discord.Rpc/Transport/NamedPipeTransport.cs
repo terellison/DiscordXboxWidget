@@ -13,9 +13,21 @@ namespace Discord.Rpc.Transport
     /// Discord exposes discord-ipc-0 through discord-ipc-9; multiple clients
     /// (stable, PTB, Canary) can be running at once, each claiming the next free slot.
     /// </summary>
+    /// <remarks>
+    /// NOT USABLE FROM THE UWP WIDGET. An AppContainer process cannot open a named pipe
+    /// whose DACL does not grant ALL APPLICATION PACKAGES, and Discord owns that pipe, so
+    /// the ACL cannot be changed from our side. Connect() fails with
+    /// "This functionality is not supported in the context of an app container".
+    /// The Game Bar docs list named pipes as a supported IPC option, but
+    /// https://github.com/microsoft/XboxGameBarSamples/issues/44 records that they are not.
+    /// Use <see cref="WebSocketTransport"/> from the widget; this type is for the console
+    /// harness and any future full-trust component.
+    /// </remarks>
     public sealed class NamedPipeTransport : IDiscordTransport
     {
         private const int MaxPipeIndex = 9;
+
+        public bool RequiresHandshakeFrame => true;
 
         private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
         private NamedPipeClientStream? _pipe;

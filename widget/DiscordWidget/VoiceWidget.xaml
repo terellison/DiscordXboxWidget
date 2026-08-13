@@ -1,0 +1,89 @@
+<Page
+    x:Class="DiscordWidget.VoiceWidget"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DiscordWidget"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid Padding="12,8,12,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0"
+                   Text="{x:Bind ViewModel.ChannelName, Mode=OneWay}"
+                   Style="{StaticResource SubtitleTextBlockStyle}"
+                   TextTrimming="CharacterEllipsis" />
+
+        <TextBlock Grid.Row="1"
+                   Text="{x:Bind ViewModel.Status, Mode=OneWay}"
+                   Visibility="{x:Bind HasText(ViewModel.Status), Mode=OneWay}"
+                   Style="{StaticResource CaptionTextBlockStyle}"
+                   Foreground="{ThemeResource SystemControlForegroundBaseMediumBrush}"
+                   TextWrapping="Wrap"
+                   Margin="0,2,0,0" />
+
+        <ListView Grid.Row="2"
+                  ItemsSource="{x:Bind ViewModel.Participants}"
+                  SelectionMode="None"
+                  Margin="0,8,0,0">
+            <ListView.ItemContainerStyle>
+                <Style TargetType="ListViewItem">
+                    <Setter Property="MinHeight" Value="32" />
+                    <Setter Property="Padding" Value="4,2" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="local:ParticipantViewModel">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Ring is always laid out; only its opacity changes, so the row
+                             does not reflow every time someone starts talking. -->
+                        <Ellipse Grid.Column="0"
+                                 Width="10" Height="10"
+                                 Fill="{StaticResource SpeakingBrush}"
+                                 Opacity="{x:Bind SpeakingOpacity, Mode=OneWay}" />
+
+                        <TextBlock Grid.Column="1"
+                                   Text="{x:Bind DisplayName}"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontWeight="{x:Bind SelfWeight}" />
+
+                        <TextBlock Grid.Column="2"
+                                   Text="{x:Bind StateGlyph}"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   Foreground="{StaticResource MutedBrush}"
+                                   FontSize="12" />
+                    </Grid>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
+
+        <StackPanel Grid.Row="3"
+                    Orientation="Horizontal"
+                    Spacing="8"
+                    Margin="0,8,0,0">
+            <Button Content="{x:Bind MuteLabel(ViewModel.IsMuted), Mode=OneWay}"
+                    Click="OnToggleMute"
+                    IsEnabled="{x:Bind ViewModel.CanControlVoice, Mode=OneWay}" />
+            <Button Content="{x:Bind DeafenLabel(ViewModel.IsDeafened), Mode=OneWay}"
+                    Click="OnToggleDeafen"
+                    IsEnabled="{x:Bind ViewModel.CanControlVoice, Mode=OneWay}" />
+            <Button Content="Leave"
+                    Click="OnLeave"
+                    IsEnabled="{x:Bind ViewModel.CanNavigate, Mode=OneWay}"
+                    Visibility="{x:Bind Visible(ViewModel.IsInVoice), Mode=OneWay}" />
+        </StackPanel>
+    </Grid>
+</Page>

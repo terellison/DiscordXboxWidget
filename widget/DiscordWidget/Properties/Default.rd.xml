@@ -1,0 +1,13 @@
+<!--
+  Runtime directives for the .NET Native toolchain (Release builds only).
+  System.Text.Json relies on reflection over the types it serializes; without these
+  the Release build trims members the RPC layer needs and fails at runtime rather
+  than at compile time.
+-->
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="*Application*" Dynamic="Required All" />
+    <Assembly Name="Discord.Rpc" Dynamic="Required All" />
+    <Namespace Name="Discord.Rpc" Serialize="Required All" />
+  </Application>
+</Directives>

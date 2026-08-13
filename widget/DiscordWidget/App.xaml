@@ -1,0 +1,13 @@
+<Application
+    x:Class="DiscordWidget.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DiscordWidget">
+    <Application.Resources>
+        <ResourceDictionary>
+            <SolidColorBrush x:Key="DiscordBlurpleBrush" Color="#5865F2" />
+            <SolidColorBrush x:Key="SpeakingBrush" Color="#3BA55D" />
+            <SolidColorBrush x:Key="MutedBrush" Color="#ED4245" />
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

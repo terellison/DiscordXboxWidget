@@ -13,6 +13,13 @@ namespace Discord.Rpc.Transport
     {
         bool IsConnected { get; }
 
+        /// <summary>
+        /// Whether the session must send an explicit HANDSHAKE frame after connecting.
+        /// True for the IPC pipe. False for WebSocket, where the client ID travels in the
+        /// query string and Discord replies with READY as soon as the socket opens.
+        /// </summary>
+        bool RequiresHandshakeFrame { get; }
+
         Task ConnectAsync(CancellationToken cancellationToken);
 
         Task SendAsync(RpcFrame frame, CancellationToken cancellationToken);

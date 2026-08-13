@@ -7,44 +7,84 @@ and mute/deafen/hop channels without leaving the game.
 
 | Component | State |
 |---|---|
-| `Discord.Rpc` — IPC transport, frame codec, session | Builds; framing verified against a live Discord client |
-| `Discord.Rpc.Harness` — console test rig | Builds; `probe` mode passing |
-| UWP Game Bar widget | Not started — blocked on the Visual Studio UWP workload |
+| `Discord.Rpc` — transports, frame codec, session | Builds; both transports verified against a live Discord client |
+| `Discord.Rpc.Harness` — console test rig | Builds; `probe` and `wsprobe` passing |
+| `DiscordWidget` — UWP Game Bar widget | Builds and packages; **not yet run inside Game Bar** |
 
 ## Architecture
 
 `IDiscordSession` is the seam. It's stated in terms of what the widget needs (current
 channel, participants, speaking, mute state) rather than how RPC delivers it, so a
 degraded WebView2-backed implementation can be swapped in if this ever targets Store
-distribution. Consumers check `SessionCapabilities` before invoking an operation;
-`DiscordRpcSession` reports `Full`, a WebView2 session would report `None`.
+distribution. Consumers check `SessionCapabilities` before invoking an operation, and
+those capabilities are derived from the scopes `AUTHENTICATE` actually granted — not from
+the ones requested, since a cached token can predate a scope change.
 
 `Discord.Rpc` targets **netstandard2.0** deliberately — UWP cannot consume net5.0+
 libraries. Do not raise that target.
 
-## The distribution constraint
+### Two transports, and why
 
-The app requests two scopes: **`rpc`** and **`identify`**.
+| Transport | Used by | Why |
+|---|---|---|
+| `NamedPipeTransport` | Console harness | `\\.\pipe\discord-ipc-0..9`, the standard desktop RPC path |
+| `WebSocketTransport` | UWP widget | `ws://127.0.0.1:6463-6472`, the only path an AppContainer can take |
+
+**The UWP widget cannot use named pipes.** An AppContainer process can only open a pipe
+whose DACL grants `ALL APPLICATION PACKAGES`, and Discord owns that pipe, so the ACL can't
+be changed from our side — `Connect()` fails with *"This functionality is not supported in
+the context of an app container"*. The Game Bar docs list named pipes as a supported IPC
+option; [microsoft/XboxGameBarSamples#44](https://github.com/microsoft/XboxGameBarSamples/issues/44)
+records that they are not, and is still open.
+
+The WebSocket path differs on the wire — the client ID travels in the query string instead
+of a `HANDSHAKE` frame, and messages are bare JSON with no length header. Both differences
+are hidden behind `IDiscordTransport.RequiresHandshakeFrame`.
+
+## Scopes
+
+The app requests **`rpc`** and **`identify`**.
 
 `SELECT_VOICE_CHANNEL` and `GET_GUILDS` require the full `rpc` scope and have no granular
 equivalent, so channel navigation forces the broad grant. Because `rpc` already encompasses
 `rpc.voice.read` and `rpc.voice.write`, requesting those too would widen the consent dialog
-without granting anything extra. `identify` is what puts a `user` object in the AUTHENTICATE
-response, which is how the widget identifies the local user among the participants.
+without granting anything extra. `identify` is what puts a `user` object in the
+`AUTHENTICATE` response, which is how the widget identifies the local user.
 
 Dropping to `rpc.voice.read` + `rpc.voice.write` alone is possible only by giving up channel
 navigation — the case `SessionCapabilities.ChannelNavigation` isolates.
+
+## The distribution constraint
 
 Discord restricts the `rpc` scope to the **application owner plus 50 whitelisted testers**
 unless the app is approved for general RPC access, and approvals are rare. Outside the
 whitelist, commands fail with code 4006 and the session reports `SessionState.Unauthorized`.
 
-That is fine for a personal build. It is a hard blocker for a Microsoft Store release,
-which is why the WebView2 fallback path is kept open at the interface level.
+That's fine for a personal build and a hard blocker for a Microsoft Store release. The
+loopback exemption below points the same way: it is available to sideloaded packages and
+not to Store-distributed ones. Two independent constraints, same conclusion — this is a
+sideload-only design, which is why the WebView2 fallback stays open at the interface level.
 
-There is a second, smaller wart: the OAuth code-for-token exchange needs the application's
-client secret, and a secret shipped inside a locally-installed widget is extractable.
-`IOAuthTokenProvider` pushes that decision to the host rather than baking it into the library.
+Second, smaller wart: the OAuth code-for-token exchange needs the client secret, and a
+secret inside a locally-installed widget is extractable. `IOAuthTokenProvider` pushes that
+decision to the host rather than baking it into the library.
+
+## Building
+
+The library and harness build with the dotnet CLI:
+
+```bash
+dotnet build
+```
+
+The UWP widget needs full MSBuild — the dotnet CLI has no WindowsXaml targets and cannot
+even evaluate the project. It's mapped in the solution so `Any CPU` skips it.
+
+```bash
+msbuild DiscordXboxWidget.sln -p:Configuration=Debug -p:Platform=x64
+```
+
+Requires the Visual Studio **Universal Windows Platform development** workload.
 
 ## Running the harness
 
@@ -54,8 +94,9 @@ Requires the Discord desktop client to be running.
 dotnet run --project src/Discord.Rpc.Harness -- probe
 ```
 
-`probe` needs no registered application — it sends a deliberately invalid client ID and
-confirms Discord parses the frame and replies with a structured error. Expected output:
+`probe` (pipe) and `wsprobe <clientId>` (WebSocket) need no registered application — they
+send a deliberately invalid client ID and confirm Discord parses the frame and replies with
+a structured error. Expected:
 
 ```
 [ok]  connected to discord-ipc-0 in 16ms
@@ -63,25 +104,48 @@ confirms Discord parses the frame and replies with a structured error. Expected 
       {"code":4000,"message":"Invalid Client ID"}
 ```
 
-The `handshake` and `watch` modes need a real application from the
-[Discord developer portal](https://discord.com/developers/applications), a redirect URI of
-`http://localhost` registered on it, and `DISCORD_CLIENT_SECRET` set in the environment.
+`handshake` and `watch` need a real application, `http://localhost` registered as a redirect
+URI, and `DISCORD_CLIENT_SECRET` in the environment. `handshake` prints the granted
+capabilities, which is the real confirmation that the scopes came through.
+
+## Widget setup
+
+Three things before the widget can connect:
+
+1. **Client ID** — set `WidgetConfig.ClientId` in `widget/DiscordWidget/WidgetConfig.cs`.
+2. **Client secret** — store it in `ApplicationData.Current.LocalSettings["DiscordClientSecret"]`.
+   The access token is then cached in the Windows credential locker, not in settings.
+3. **Loopback exemption** — packaged apps are blocked from localhost by default, so the
+   WebSocket transport cannot reach Discord without this:
 
 ```bash
-dotnet run --project src/Discord.Rpc.Harness -- watch <clientId>
+CheckNetIsolation.exe LoopbackExempt -a -n=<PackageFamilyName>
 ```
 
-## Next: the widget shell
+Visual Studio adds the exemption automatically while debugging, so this only bites on a
+sideloaded install.
 
-Blocked until the UWP workload is installed:
+## Notes on the widget
 
-```bash
-"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe" modify --installPath "C:\Program Files\Microsoft Visual Studio\2022\Community" --add Microsoft.VisualStudio.Workload.Universal --includeRecommended --passive
-```
+- Extension name is `microsoft.gameBarUIExtension` — not `microsoft.gameBar`.
+- Game Bar activates widgets by **protocol activation** (`ms-gamebarwidget:`), so `OnLaunched`
+  is never called; the work happens in `OnActivated`.
+- The `XboxGameBarWidget` object must be held for the app's lifetime — it owns the private
+  channel to Game Bar that drives focus and input.
+- Repeat activations must **not** construct a second `XboxGameBarWidget`; guard on
+  `IsLaunchActivation`.
+- `XboxGameBarWidgetActivity` is opened while the user is in voice and completed when they
+  leave. Without it Game Bar idle-shuts-down the widget mid-call.
+- The manifest needs the proxy/stub registration block outside `<Applications>`, or the
+  Game Bar private interfaces fail to marshal.
 
-Then a UWP XAML project referencing `Microsoft.Gaming.XboxGameBar`, with a
-`windows.appExtension` of type `microsoft.gameBar` in the manifest. Two SDK APIs matter
-disproportionately here:
+Tile art in `Assets/` and `GameBar/` is generated placeholder — flat blurple with a white
+circle. Replace before any real use.
 
-- **`XboxGameBarWidgetActivity`** — without it Game Bar idle-shuts-down the widget mid-call.
-- **`XboxGameBarHotkeyWatcher`** — push-to-talk and mute while a game holds focus.
+## Not done yet
+
+- Never launched inside Game Bar. Building and packaging is not the same as working.
+- `XboxGameBarHotkeyWatcher` for push-to-talk / mute while a game holds focus.
+- Channel switching UI — `JoinVoiceChannelAsync` exists but nothing calls it, since
+  listing available channels needs `GET_GUILDS` / `GET_CHANNELS` plumbing.
+- No tests.

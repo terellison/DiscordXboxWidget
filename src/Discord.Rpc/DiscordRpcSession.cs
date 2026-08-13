@@ -90,13 +90,18 @@ namespace Discord.Rpc
 
                 _readLoop = Task.Run(() => ReadLoopAsync(_shutdown.Token));
 
-                var handshake = JsonSerializer.Serialize(new Dictionary<string, object>
+                // The WebSocket transport authenticates via its query string and would be
+                // disconnected for sending a handshake frame it never expects.
+                if (_transport.RequiresHandshakeFrame)
                 {
-                    ["v"] = 1,
-                    ["client_id"] = _clientId,
-                });
-                await _transport.SendAsync(new RpcFrame(RpcOpcode.Handshake, handshake), cancellationToken)
-                    .ConfigureAwait(false);
+                    var handshake = JsonSerializer.Serialize(new Dictionary<string, object>
+                    {
+                        ["v"] = 1,
+                        ["client_id"] = _clientId,
+                    });
+                    await _transport.SendAsync(new RpcFrame(RpcOpcode.Handshake, handshake), cancellationToken)
+                        .ConfigureAwait(false);
+                }
 
                 await WithCancellation(ready.Task, cancellationToken).ConfigureAwait(false);
 
