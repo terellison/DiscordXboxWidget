@@ -1,0 +1,16 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Packaging output for the UWP widget
+AppPackages/
+BundleArtifacts/
+*.appx
+*.appxbundle
+*.msixbundle
+
+# Never commit the client secret or cached tokens
+*.secret
+token-*.txt
