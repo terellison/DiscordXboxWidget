@@ -152,9 +152,9 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
 }
 
 /// <summary>
-/// Minimal token provider for local testing. Caches to disk so the Discord consent
-/// dialog only appears once. Not suitable for distribution: the client secret comes from
-/// an environment variable and the cached token is stored unencrypted.
+/// Minimal token provider for local testing. Caches to disk so the Discord consent dialog
+/// only appears once. Uses PKCE, so there is no client secret to supply. Not suitable for
+/// distribution: the cached token is stored unencrypted.
 /// </summary>
 internal sealed class ConsoleTokenProvider(string clientId) : IOAuthTokenProvider
 {
@@ -172,21 +172,19 @@ internal sealed class ConsoleTokenProvider(string clientId) : IOAuthTokenProvide
         return string.IsNullOrEmpty(token) ? null : token;
     }
 
-    public async Task<string> ExchangeCodeAsync(string authorizationCode, CancellationToken cancellationToken)
+    public async Task<string> ExchangeCodeAsync(
+        string authorizationCode, string codeVerifier, CancellationToken cancellationToken)
     {
-        var secret = Environment.GetEnvironmentVariable("DISCORD_CLIENT_SECRET");
-        if (string.IsNullOrWhiteSpace(secret))
-            throw new InvalidOperationException(
-                "Set DISCORD_CLIENT_SECRET to the secret from your app at https://discord.com/developers/applications");
-
         using var response = await Http.PostAsync(
             "https://discord.com/api/oauth2/token",
             new FormUrlEncodedContent(new Dictionary<string, string>
             {
                 ["client_id"] = clientId,
-                ["client_secret"] = secret,
                 ["grant_type"] = "authorization_code",
                 ["code"] = authorizationCode,
+                // Replaces client_secret. Requires the PUBLIC_OAUTH2_CLIENT flag on the app;
+                // without the flag Discord rejects the exchange with invalid_client.
+                ["code_verifier"] = codeVerifier,
                 // Discord requires this to be present and to match a redirect URI
                 // registered on the application, even though RPC never redirects.
                 ["redirect_uri"] = "http://localhost",

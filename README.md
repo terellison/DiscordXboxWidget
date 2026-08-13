@@ -65,9 +65,22 @@ loopback exemption below points the same way: it is available to sideloaded pack
 not to Store-distributed ones. Two independent constraints, same conclusion — this is a
 sideload-only design, which is why the WebView2 fallback stays open at the interface level.
 
-Second, smaller wart: the OAuth code-for-token exchange needs the client secret, and a
-secret inside a locally-installed widget is extractable. `IOAuthTokenProvider` pushes that
-decision to the host rather than baking it into the library.
+## No client secret
+
+There isn't one, by design. The token exchange uses **PKCE**: `AUTHORIZE` carries a
+`code_challenge`, the exchange carries the matching `code_verifier`, and Discord requires
+`client_secret` only when `code_verifier` is absent.
+
+This matters because a secret inside a sideloaded package is extractable by anyone holding
+the package — there is no safe place to put one, so the design removes the requirement
+instead of hiding it.
+
+**This requires the `PUBLIC_OAUTH2_CLIENT` flag on your Discord application.** Without it
+the exchange fails with `invalid_client`.
+
+Known Discord bug: refresh tokens still demand a secret even under PKCE
+([discord-api-docs#5531](https://github.com/discord/discord-api-docs/issues/5531)). Not hit
+here — the token is cached and the authorize flow re-runs on expiry rather than refreshing.
 
 ## Building
 
@@ -104,17 +117,18 @@ a structured error. Expected:
       {"code":4000,"message":"Invalid Client ID"}
 ```
 
-`handshake` and `watch` need a real application, `http://localhost` registered as a redirect
-URI, and `DISCORD_CLIENT_SECRET` in the environment. `handshake` prints the granted
-capabilities, which is the real confirmation that the scopes came through.
+`handshake` and `watch` need a real application with `http://localhost` registered as a
+redirect URI and the `PUBLIC_OAUTH2_CLIENT` flag set. No secret and no environment variable.
+`handshake` prints the granted capabilities, which is the real confirmation that the scopes
+came through. Discord shows a consent dialog on first run; the token is then cached.
 
 ## Widget setup
 
 Three things before the widget can connect:
 
 1. **Client ID** — set `WidgetConfig.ClientId` in `widget/DiscordWidget/WidgetConfig.cs`.
-2. **Client secret** — store it in `ApplicationData.Current.LocalSettings["DiscordClientSecret"]`.
-   The access token is then cached in the Windows credential locker, not in settings.
+2. **`PUBLIC_OAUTH2_CLIENT` flag** on the application, so the PKCE exchange works without a
+   secret. The access token is cached in the Windows credential locker.
 3. **Loopback exemption** — packaged apps are blocked from localhost by default, so the
    WebSocket transport cannot reach Discord without this:
 

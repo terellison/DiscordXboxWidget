@@ -129,17 +129,24 @@ namespace Discord.Rpc
 
             if (string.IsNullOrEmpty(token))
             {
+                // PKCE stands in for the client secret: the challenge goes out with the
+                // authorization request, the verifier comes back on the exchange.
+                var pkce = PkceChallenge.Create();
+
                 // Shows a consent dialog in the Discord client; blocks until the user responds.
                 var authorize = await SendCommandAsync("AUTHORIZE", new Dictionary<string, object?>
                 {
                     ["client_id"] = _clientId,
                     ["scopes"] = RequiredScopes,
+                    ["code_challenge"] = pkce.Challenge,
+                    ["code_challenge_method"] = pkce.Method,
                 }, cancellationToken).ConfigureAwait(false);
 
                 var code = authorize.GetProperty("code").GetString()
                            ?? throw new DiscordRpcException(0, "AUTHORIZE returned no code.");
 
-                token = await _tokenProvider.ExchangeCodeAsync(code, cancellationToken).ConfigureAwait(false);
+                token = await _tokenProvider.ExchangeCodeAsync(code, pkce.Verifier, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             var authenticated = await SendCommandAsync("AUTHENTICATE", new Dictionary<string, object?>
