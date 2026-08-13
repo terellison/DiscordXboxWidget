@@ -142,9 +142,30 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
     session.SpeakingChanged += (_, e) =>
         Console.WriteLine($"[speaking] {e.UserId} {(e.IsSpeaking ? "started" : "stopped")}");
     session.VoiceChannelChanged += (_, channel) =>
-        Console.WriteLine(channel == null
-            ? "[channel]  left voice"
-            : $"[channel]  {channel.Name} ({channel.Participants.Count} present)");
+    {
+        if (channel == null)
+        {
+            Console.WriteLine("[channel]  left voice");
+            return;
+        }
+
+        Console.WriteLine($"[channel]  {channel.Name} ({channel.Participants.Count} present)");
+
+        // Printed per participant so the ParseChannel field mapping is visible: a bare
+        // count looks identical whether or not names and voice state actually parsed.
+        foreach (var p in channel.Participants)
+        {
+            var flags = new List<string>();
+            if (p.IsMuted) flags.Add("muted");
+            if (p.IsDeafened) flags.Add("deafened");
+            if (p.Id == session.CurrentUserId) flags.Add("self");
+
+            var suffix = flags.Count > 0 ? $"  [{string.Join(", ", flags)}]" : string.Empty;
+            var nick = p.Nickname == null ? "" : $" (nick: {p.Nickname})";
+
+            Console.WriteLine($"           - {p.DisplayName}{nick}  id={p.Id}{suffix}");
+        }
+    };
 
     await session.ConnectAsync(ct);
     Console.WriteLine("Watching. Ctrl+C to stop.");
