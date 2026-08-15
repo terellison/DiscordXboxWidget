@@ -148,25 +148,12 @@ jobs:
             $notes = ''
           }
 
-          $install = @'
-
-## Installing
-
-This package is signed with a self-signed certificate, so Windows must be told to trust it
-before it will install. In an **elevated** PowerShell:
-
-```powershell
-Import-Certificate -FilePath .\DiscordXboxWidget.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-Add-AppxPackage .\DiscordXboxWidget_0.1.0.0_x64.msix
-```
-
-Then press **Win+G** and pick **Discord Voice** from the widget menu. The Discord desktop
-client must be running. Full instructions, including what to do if Discord refuses the
-built-in application, are in the [README](https://github.com/terellison/DiscordXboxWidget#install).
-'@
+          # Boilerplate lives in its own file. Embedding markdown in a YAML block scalar
+          # means any line at column zero silently ends the block and breaks the workflow.
+          $install = Get-Content .github/release-install-notes.md -Raw
 
           $signing = if ('${{ steps.signing.outputs.signed }}' -eq 'true') {
-            "`n_Signed; ``DiscordXboxWidget.cer`` below is the certificate to trust._`n"
+            "`n_Signed. ``DiscordXboxWidget.cer`` below is the certificate to trust._`n"
           } else {
             "`n> **This build is unsigned** and cannot be installed until it is signed.`n"
           }
