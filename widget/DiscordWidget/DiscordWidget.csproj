@@ -71,8 +71,8 @@
     <Compile Include="VoiceWidget.xaml.cs">
       <DependentUpon>VoiceWidget.xaml</DependentUpon>
     </Compile>
+    <Compile Include="AppServiceSession.cs" />
     <Compile Include="WidgetViewModel.cs" />
-    <Compile Include="WidgetConfig.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
 
@@ -108,6 +108,34 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\Discord.Rpc\Discord.Rpc.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!-- Supplies FullTrustProcessLauncher, which is not part of the base UWP surface. -->
+    <SDKReference Include="WindowsDesktop, Version=10.0.26100.0">
+      <Name>Windows Desktop Extensions for the UWP</Name>
+    </SDKReference>
+  </ItemGroup>
+
+  <!-- Package the full-trust bridge under bridge\, matching the Executable path declared
+       on the windows.fullTrustProcess extension. Built via a project reference would pull
+       a net9.0 assembly into a UWP reference graph, so it is consumed as content instead
+       and ordered with a solution-level build dependency. -->
+  <PropertyGroup>
+    <BridgeOutputDir>$(MSBuildThisFileDirectory)..\..\src\Discord.Rpc.Bridge\bin\$(Configuration)\net9.0-windows10.0.19041.0\win-x64\</BridgeOutputDir>
+  </PropertyGroup>
+
+  <Target Name="IncludeBridgePayload" BeforeTargets="AssignTargetPaths">
+    <ItemGroup>
+      <BridgeFile Include="$(BridgeOutputDir)**\*.*"
+                  Exclude="$(BridgeOutputDir)**\*.pdb;$(BridgeOutputDir)**\*.xml" />
+      <Content Include="@(BridgeFile)">
+        <Link>bridge\%(RecursiveDir)%(Filename)%(Extension)</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+    <Warning Condition="'@(BridgeFile)' == ''"
+             Text="Bridge output not found at $(BridgeOutputDir). Build Discord.Rpc.Bridge first or the widget will package without its full-trust component." />
+  </Target>
 
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
 </Project>

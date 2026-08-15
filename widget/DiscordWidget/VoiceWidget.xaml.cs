@@ -32,7 +32,7 @@ namespace DiscordWidget
 
             _widget = e.Parameter as XboxGameBarWidget;
 
-            ViewModel = new WidgetViewModel(Dispatcher);
+            ViewModel = new WidgetViewModel(Dispatcher, App.Session);
             ViewModel.VoicePresenceChanged += OnVoicePresenceChanged;
             Bindings.Update();
 

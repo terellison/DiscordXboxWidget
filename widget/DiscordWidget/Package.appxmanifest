@@ -4,8 +4,9 @@
   xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 mp rescap">
+  IgnorableNamespaces="uap uap3 mp desktop rescap">
 
   <Identity
     Name="DiscordXboxWidget"
@@ -47,6 +48,17 @@
       </uap:VisualElements>
 
       <Extensions>
+        <!-- In-process app service: no EntryPoint attribute, so activation arrives at
+             App.OnBackgroundActivated and the connection can be handed straight to the
+             running widget UI instead of a separate background task host. -->
+        <uap:Extension Category="windows.appService">
+          <uap:AppService Name="DiscordRpcBridge" />
+        </uap:Extension>
+
+        <!-- The full-trust half. It lives outside the AppContainer, which is the only way
+             to reach Discord's named pipe. -->
+        <desktop:Extension Category="windows.fullTrustProcess" Executable="bridge\Discord.Rpc.Bridge.exe" />
+
         <uap3:Extension Category="windows.appExtension">
           <!-- Name is the Game Bar widget contract and must be exactly this string. -->
           <uap3:AppExtension Name="microsoft.gameBarUIExtension"
@@ -83,10 +95,13 @@
   </Applications>
 
   <Capabilities>
-    <!-- Needed for the OAuth token exchange against discord.com. Note that loopback to
-         the local Discord client is NOT granted by any capability: a sideloaded build
-         needs CheckNetIsolation LoopbackExempt. See WebSocketTransport. -->
+    <!-- The widget itself no longer talks to Discord or to discord.com; the bridge does
+         both. Kept only so the widget can be pointed back at a direct transport for
+         debugging without editing the manifest. -->
     <Capability Name="internetClient" />
+    <!-- Required by FullTrustProcessLauncher. Restricted: fine for sideloading, and would
+         need Store onboarding review, which this design does not target anyway. -->
+    <rescap:Capability Name="runFullTrust" />
   </Capabilities>
 
   <!-- Proxy/stub registration for the Game Bar private types. This sits outside

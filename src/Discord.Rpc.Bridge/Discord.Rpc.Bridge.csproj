@@ -15,6 +15,12 @@
     <!-- Must match the widget's architecture to be packaged alongside it. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <SelfContained>false</SelfContained>
+    <!-- Pinned explicitly so the path does not gain an extra x64\ segment when built as
+         part of the solution with Platform=x64. The widget packages this directory by
+         path, and a silent move would package the widget with no bridge in it. -->
+    <OutputPath>$(MSBuildThisFileDirectory)bin\$(Configuration)\</OutputPath>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+    <AppendRuntimeIdentifierToOutputPath>true</AppendRuntimeIdentifierToOutputPath>
   </PropertyGroup>
 
   <ItemGroup>

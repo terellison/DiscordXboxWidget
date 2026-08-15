@@ -19,6 +19,12 @@ namespace Discord.Rpc
 
         SessionCapabilities Capabilities { get; }
 
+        /// <summary>
+        /// The local user's ID, used to tell "me" apart from other participants.
+        /// Null unless the identify scope was granted.
+        /// </summary>
+        string? CurrentUserId { get; }
+
         Task ConnectAsync(CancellationToken cancellationToken);
 
         Task<VoiceChannelSnapshot?> GetCurrentVoiceChannelAsync(CancellationToken cancellationToken);

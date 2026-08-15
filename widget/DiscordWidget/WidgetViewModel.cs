@@ -66,7 +66,9 @@ namespace DiscordWidget
         private readonly CoreDispatcher _dispatcher;
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
 
-        private DiscordRpcSession _session;
+        // Typed as the interface, not the RPC session: the widget now reaches Discord
+        // through the full-trust bridge, and nothing here had to change to accommodate that.
+        private readonly IDiscordSession _session;
         private string _channelName = "Not connected";
         private string _status = "Connecting to Discord...";
         private bool _isMuted;
@@ -126,28 +128,16 @@ namespace DiscordWidget
         /// stop the Game Bar activity that prevents idle shutdown.</summary>
         public event EventHandler<bool> VoicePresenceChanged;
 
-        public WidgetViewModel(CoreDispatcher dispatcher)
+        public WidgetViewModel(CoreDispatcher dispatcher, IDiscordSession session)
         {
             _dispatcher = dispatcher;
+            _session = session;
         }
 
         public async Task ConnectAsync()
         {
-            if (!WidgetConfig.IsConfigured)
-            {
-                Status = "Set WidgetConfig.ClientId to your Discord application ID.";
-                return;
-            }
-
             try
             {
-                // WebSocket, not the named pipe: an AppContainer cannot open Discord's pipe.
-                var transport = new WebSocketTransport(WidgetConfig.ClientId);
-                _session = new DiscordRpcSession(
-                    WidgetConfig.ClientId,
-                    new VaultTokenProvider(WidgetConfig.ClientId),
-                    transport);
-
                 _session.StateChanged += OnStateChanged;
                 _session.SpeakingChanged += OnSpeakingChanged;
                 _session.VoiceChannelChanged += OnVoiceChannelChanged;
@@ -325,8 +315,8 @@ namespace DiscordWidget
                 _session.StateChanged -= OnStateChanged;
                 _session.SpeakingChanged -= OnSpeakingChanged;
                 _session.VoiceChannelChanged -= OnVoiceChannelChanged;
-                _session.Dispose();
-                _session = null;
+                // Not disposed here: the session is owned by App and outlives this page, so
+                // that a re-navigated widget reuses the already-running bridge.
             }
 
             _lifetime.Dispose();

@@ -12,6 +12,9 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "widget", "widget", "{9A4B7C21-3E5D-4F86-B0A9-2D6C8E1F5B37}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DiscordWidget", "widget\DiscordWidget\DiscordWidget.csproj", "{6F3D9A21-4C7E-4B2A-9E51-8B0C7D5A1E44}"
+	ProjectSection(ProjectDependencies) = postProject
+		{0EE4B469-6D05-492A-BD0C-7D482C109591} = {0EE4B469-6D05-492A-BD0C-7D482C109591}
+	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Discord.Rpc.Bridge", "src\Discord.Rpc.Bridge\Discord.Rpc.Bridge.csproj", "{0EE4B469-6D05-492A-BD0C-7D482C109591}"
 EndProject

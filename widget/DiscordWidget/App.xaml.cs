@@ -1,6 +1,8 @@
 using System;
 using Microsoft.Gaming.XboxGameBar;
 using Windows.ApplicationModel.Activation;
+using Windows.ApplicationModel.AppService;
+using Windows.ApplicationModel.Background;
 using Windows.UI.Xaml;
 using Windows.UI.Xaml.Controls;
 using Windows.UI.Xaml.Navigation;
@@ -9,6 +11,15 @@ namespace DiscordWidget
 {
     public sealed partial class App : Application
     {
+        /// <summary>
+        /// Owned by the app rather than the page: the bridge connects back through
+        /// OnBackgroundActivated, which is an app-level entry point, and that can happen
+        /// before or after the widget page finishes navigating.
+        /// </summary>
+        public static AppServiceSession Session { get; } = new AppServiceSession();
+
+        private BackgroundTaskDeferral _appServiceDeferral;
+
         /// <summary>
         /// Must outlive the activation call: the object owns the private channel between
         /// this widget and Game Bar that drives focus and input transitions. Letting it
@@ -63,6 +74,32 @@ namespace DiscordWidget
 
             rootFrame.Navigate(typeof(VoiceWidget), _widget);
             Window.Current.Activate();
+        }
+
+        /// <summary>
+        /// The full-trust bridge opening its AppServiceConnection lands here, because the
+        /// windows.appService extension declares no EntryPoint and is therefore in-process.
+        /// </summary>
+        protected override void OnBackgroundActivated(BackgroundActivatedEventArgs args)
+        {
+            base.OnBackgroundActivated(args);
+
+            if (!(args.TaskInstance.TriggerDetails is AppServiceTriggerDetails details)) return;
+            if (details.Name != Discord.Rpc.Bridge.BridgeProtocol.AppServiceName) return;
+
+            // Held for as long as the bridge connection lives; completing it early tells
+            // Windows the service is finished and tears the connection down.
+            _appServiceDeferral = args.TaskInstance.GetDeferral();
+            args.TaskInstance.Canceled += (_, __) => ReleaseAppServiceDeferral();
+            details.AppServiceConnection.ServiceClosed += (_, __) => ReleaseAppServiceDeferral();
+
+            Session.AttachBridge(details.AppServiceConnection);
+        }
+
+        private void ReleaseAppServiceDeferral()
+        {
+            _appServiceDeferral?.Complete();
+            _appServiceDeferral = null;
         }
 
         private void OnWidgetWindowClosed(object sender, Windows.UI.Core.CoreWindowEventArgs e)
