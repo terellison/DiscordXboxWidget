@@ -41,7 +41,7 @@ back on. Inspect the certificate first if you would rather not take that on trus
 Download **every file** attached to the release into the same folder, then:
 
 ```bash
-Add-AppxPackage -Path .\DiscordWidget_0.1.0.0_x64.msix -DependencyPath .\Microsoft.NET.Native.Framework.2.2.appx,.\Microsoft.NET.Native.Runtime.2.2.appx,.\Microsoft.VCLibs.x64.14.00.appx
+Add-AppxPackage -Path .\DiscordWidget_0.1.1.0_x64.msix -DependencyPath .\Microsoft.NET.Native.Framework.2.2.appx,.\Microsoft.NET.Native.Runtime.2.2.appx,.\Microsoft.VCLibs.x64.14.00.appx
 ```
 
 The framework packages matter: Windows cannot fetch them from the Store for a sideloaded
