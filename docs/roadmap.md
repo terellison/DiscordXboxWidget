@@ -41,9 +41,26 @@ Discord keybind, so it has not been built.
 This was briefly an open question — whether Discord's app verification would unlock general
 RPC access, letting a shipped application id serve everyone.
 
-It is moot. Discord's Developer Terms §2(d) classify the Application ID as a developer
-credential and forbid embedding developer credentials in open source projects, so a built-in
-id would not be permissible even if verification granted the scope. Registration is a
-one-time two-minute step, and it means users authorize an application they control.
+Two independent findings closed it.
 
-Verification remains worth completing for its own sake, but it does not change the install.
+**Terms.** Discord's Developer Terms §2(d) classify the Application ID as a developer
+credential and forbid embedding developer credentials in open source projects, so a built-in
+id would not be permissible even if verification granted the scope.
+
+**Verification actively breaks RPC.** App verification requires the application to belong to
+a Team, and a team-owned application cannot request the `rpc` scope at all — `AUTHORIZE`
+fails with `invalid_scope`. Measured directly, same Discord account, same machine, minutes
+apart:
+
+| Application | `identify` | `rpc` |
+|---|---|---|
+| Team-owned (verification candidate) | allowed | **refused, `invalid_scope`** |
+| Personally owned | allowed | allowed |
+
+The documented precondition is that the `rpc` scope is available to "the application owner"
+plus a tester allowlist. Team ownership evidently stops the authorizing user counting as
+that owner. Nothing in Discord's documentation mentions the interaction.
+
+So verification and RPC access are mutually exclusive for an app like this. **Do not move
+the application to a Team.** `Discord.Rpc.Harness scopetest <clientId>` reproduces the
+result in about a minute if this ever needs re-checking.

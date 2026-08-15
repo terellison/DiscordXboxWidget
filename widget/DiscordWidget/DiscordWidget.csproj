@@ -71,6 +71,9 @@
     <Compile Include="VoiceWidget.xaml.cs">
       <DependentUpon>VoiceWidget.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SettingsWidget.xaml.cs">
+      <DependentUpon>SettingsWidget.xaml</DependentUpon>
+    </Compile>
     <Compile Include="AppServiceSession.cs" />
     <Compile Include="WidgetLog.cs" />
     <Compile Include="WidgetViewModel.cs" />
@@ -83,6 +86,10 @@
       <SubType>Designer</SubType>
     </ApplicationDefinition>
     <Page Include="VoiceWidget.xaml">
+      <Generator>MSBuild:Compile</Generator>
+      <SubType>Designer</SubType>
+    </Page>
+    <Page Include="SettingsWidget.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>

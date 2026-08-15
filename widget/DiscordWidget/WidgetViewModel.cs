@@ -322,6 +322,35 @@ namespace DiscordWidget
             }
         }
 
+        /// <summary>
+        /// Asks the bridge to drop its Discord session and connect again. Deliberately not
+        /// gated on capabilities: the case where reconnecting helps most is the one where
+        /// the session never connected and there are no capabilities at all.
+        /// </summary>
+        public async Task ReconnectAsync()
+        {
+            if (!(_session is AppServiceSession bridge)) return;
+
+            await RunOnUiAsync(() =>
+            {
+                Status = "Reconnecting...";
+                Participants.Clear();
+                ChannelName = "Not connected";
+            });
+
+            try
+            {
+                await bridge.ReconnectAsync(_lifetime.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                await RunOnUiAsync(() => Status = ex.Message);
+            }
+        }
+
         public async Task LeaveAsync()
         {
             if (_session == null || !CanNavigate) return;

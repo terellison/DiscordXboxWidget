@@ -100,6 +100,12 @@
             <Button Content="Switch"
                     Click="OnBrowse"
                     IsEnabled="{x:Bind ViewModel.CanNavigate, Mode=OneWay}" />
+            <!-- Icon-only: a fifth worded button does not fit at 320px. Always enabled,
+                 because reconnecting is exactly what you want when nothing else works. -->
+            <Button Content="&#xE72C;"
+                    FontFamily="Segoe MDL2 Assets"
+                    Click="OnReload"
+                    ToolTipService.ToolTip="Reconnect to Discord" />
         </StackPanel>
 
         <!-- Picker overlay. Covers the whole widget rather than sitting alongside: at

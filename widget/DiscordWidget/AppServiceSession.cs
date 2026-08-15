@@ -130,6 +130,24 @@ namespace DiscordWidget
         public Task LeaveVoiceChannelAsync(CancellationToken cancellationToken) =>
             SendAsync(BridgeProtocol.CmdLeaveChannel, null, null, cancellationToken);
 
+        /// <summary>Reads the configured Discord application id, empty if none is set.</summary>
+        public async Task<string> GetClientIdAsync(CancellationToken cancellationToken)
+        {
+            var payload = await SendAsync(BridgeProtocol.CmdGetConfig, null, null, cancellationToken);
+            using (var doc = System.Text.Json.JsonDocument.Parse(payload))
+            {
+                return doc.RootElement.TryGetProperty("clientId", out var v) ? v.GetString() ?? string.Empty : string.Empty;
+            }
+        }
+
+        /// <summary>Writes the application id and reconnects with it.</summary>
+        public Task SetClientIdAsync(string clientId, CancellationToken cancellationToken) =>
+            SendAsync(BridgeProtocol.CmdSetConfig, null, clientId, cancellationToken, BridgeProtocol.ArgClientId);
+
+        /// <summary>Drops the Discord session and connects again.</summary>
+        public Task ReconnectAsync(CancellationToken cancellationToken) =>
+            SendAsync(BridgeProtocol.CmdReconnect, null, null, cancellationToken);
+
         private async Task<string> SendAsync(
             string command, bool? boolArg, string idArg, CancellationToken cancellationToken,
             string idKey = BridgeProtocol.ArgChannelId)

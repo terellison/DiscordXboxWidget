@@ -17,12 +17,6 @@ internal sealed class AppServiceBridge : IDisposable
     private readonly TaskCompletionSource<object?> _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private AppServiceConnection? _connection;
 
-    /// <summary>
-    /// When set, the bridge serves the AppService purely to report this message and never
-    /// attempts Discord. Used when no application id is configured, so the widget explains
-    /// the problem instead of showing a launch timeout.
-    /// </summary>
-    public string? StartupFault { get; init; }
 
     public AppServiceBridge(BridgeHost host)
     {
@@ -47,13 +41,9 @@ internal sealed class AppServiceBridge : IDisposable
         if (status != AppServiceConnectionStatus.Success)
             throw new InvalidOperationException($"Could not open AppService '{BridgeProtocol.AppServiceName}': {status}");
 
-        if (StartupFault != null)
-        {
-            PushFault(StartupFault);
-        }
         // Connect to Discord only after the channel to the widget exists, so the state and
         // channel events raised during connect are not dropped on the floor.
-        else try
+        try
         {
             await _host.ConnectAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -99,6 +89,8 @@ internal sealed class AppServiceBridge : IDisposable
                 var stringArg = message.TryGetValue(BridgeProtocol.ArgChannelId, out var s) ? s as string : null;
                 if (stringArg == null && message.TryGetValue(BridgeProtocol.ArgGuildId, out var g))
                     stringArg = g as string;
+                if (stringArg == null && message.TryGetValue(BridgeProtocol.ArgClientId, out var appId))
+                    stringArg = appId as string;
                 var boolArg = message.TryGetValue(BridgeProtocol.ArgValue, out var b) && b is bool flag && flag;
 
                 var payload = await _host.ExecuteAsync(command!, stringArg, boolArg, CancellationToken.None);

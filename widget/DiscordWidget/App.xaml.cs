@@ -27,6 +27,15 @@ namespace DiscordWidget
         /// </summary>
         private XboxGameBarWidget _widget;
 
+        /// <summary>
+        /// Held separately from the main widget. Game Bar activates the settings widget as
+        /// its own activation with its own window, and both objects must outlive it.
+        /// </summary>
+        private XboxGameBarWidget _settingsWidget;
+
+        private const string VoiceWidgetId = "DiscordVoice";
+        private const string SettingsWidgetId = "DiscordVoiceSettings";
+
         public App()
         {
             InitializeComponent();
@@ -72,14 +81,27 @@ namespace DiscordWidget
             rootFrame.NavigationFailed += OnNavigationFailed;
             Window.Current.Content = rootFrame;
 
-            _widget = new XboxGameBarWidget(
-                widgetArgs,
-                Window.Current.CoreWindow,
-                rootFrame);
+            // AppExtensionId distinguishes the two widgets. Game Bar should never send an id
+            // we did not declare, but an unrecognised one must not silently show the wrong UI.
+            switch (widgetArgs.AppExtensionId)
+            {
+                case VoiceWidgetId:
+                    _widget = new XboxGameBarWidget(widgetArgs, Window.Current.CoreWindow, rootFrame);
+                    Window.Current.Closed += OnWidgetWindowClosed;
+                    rootFrame.Navigate(typeof(VoiceWidget), _widget);
+                    break;
 
-            Window.Current.Closed += OnWidgetWindowClosed;
+                case SettingsWidgetId:
+                    _settingsWidget = new XboxGameBarWidget(widgetArgs, Window.Current.CoreWindow, rootFrame);
+                    Window.Current.Closed += OnSettingsWindowClosed;
+                    rootFrame.Navigate(typeof(SettingsWidget), _settingsWidget);
+                    break;
 
-            rootFrame.Navigate(typeof(VoiceWidget), _widget);
+                default:
+                    WidgetLog.Write($"Unknown AppExtensionId '{widgetArgs.AppExtensionId}'; ignoring activation.");
+                    return;
+            }
+
             Window.Current.Activate();
         }
 
@@ -113,6 +135,12 @@ namespace DiscordWidget
         {
             _widget = null;
             Window.Current.Closed -= OnWidgetWindowClosed;
+        }
+
+        private void OnSettingsWindowClosed(object sender, Windows.UI.Core.CoreWindowEventArgs e)
+        {
+            _settingsWidget = null;
+            Window.Current.Closed -= OnSettingsWindowClosed;
         }
 
         private void OnNavigationFailed(object sender, NavigationFailedEventArgs e)

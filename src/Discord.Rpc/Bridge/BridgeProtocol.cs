@@ -41,10 +41,20 @@ namespace Discord.Rpc.Bridge
         public const string CmdGetGuilds = "getGuilds";
         public const string CmdGetVoiceChannels = "getVoiceChannels";
 
+        /// <summary>Reads the configured application id, for the settings widget to display.</summary>
+        public const string CmdGetConfig = "getConfig";
+
+        /// <summary>Writes the application id. Served even when nothing is configured yet.</summary>
+        public const string CmdSetConfig = "setConfig";
+
+        /// <summary>Drops the Discord session and connects again with the current config.</summary>
+        public const string CmdReconnect = "reconnect";
+
         // Command arguments.
         public const string ArgValue = "value";
         public const string ArgChannelId = "channelId";
         public const string ArgGuildId = "guildId";
+        public const string ArgClientId = "clientId";
 
         // Bridge -> widget, unsolicited.
         public const string EvtState = "state";

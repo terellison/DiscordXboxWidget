@@ -51,6 +51,10 @@ try
             await ChannelsAsync(RequireClientId(args), cts.Token);
             break;
 
+        case "scopetest":
+            await ScopeTestAsync(RequireClientId(args), cts.Token);
+            break;
+
         default:
             Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | wsprobe | handshake | watch | toggle");
             return 2;
@@ -187,6 +191,59 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
     await session.ConnectAsync(ct);
     Console.WriteLine("Watching. Ctrl+C to stop.");
     await Task.Delay(Timeout.Infinite, ct);
+}
+
+// Sends AUTHORIZE with each scope set in turn to establish which one an application is
+// refused. Talks to the pipe directly rather than through DiscordRpcSession, so a failure
+// cannot be an artefact of the session's own connect sequence.
+//
+// A scope the application IS allowed will pop Discord's consent dialog; decline it, the
+// result is already known by then.
+static async Task ScopeTestAsync(string clientId, CancellationToken ct)
+{
+    string[][] sets = { new[] { "identify" }, new[] { "rpc" }, new[] { "rpc", "identify" } };
+
+    foreach (var scopes in sets)
+    {
+        using var transport = new NamedPipeTransport();
+        await transport.ConnectAsync(ct);
+
+        await transport.SendAsync(
+            new RpcFrame(RpcOpcode.Handshake, $"{{\"v\":1,\"client_id\":\"{clientId}\"}}"), ct);
+
+        var ready = await transport.ReceiveAsync(ct);
+        if (ready?.Opcode == RpcOpcode.Close)
+        {
+            Console.WriteLine($"[{string.Join("+", scopes)}] handshake refused: {ready.Value.Payload}");
+            return;
+        }
+
+        var scopeJson = string.Join(",", scopes.Select(s => $"\"{s}\""));
+        await transport.SendAsync(new RpcFrame(RpcOpcode.Frame,
+            $"{{\"cmd\":\"AUTHORIZE\",\"nonce\":\"scopetest\",\"args\":{{\"client_id\":\"{clientId}\",\"scopes\":[{scopeJson}]}}}}"), ct);
+
+        // Consent dialogs are user-paced, so allow generously before giving up.
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(45));
+
+        try
+        {
+            var reply = await transport.ReceiveAsync(timeout.Token);
+            var text = reply?.Payload ?? "<closed>";
+
+            // Classify on the evt field, not on the presence of "code": a successful
+            // AUTHORIZE also returns a "code", the authorization code, and matching on that
+            // reports every success as a failure.
+            var verdict = text.Contains("\"evt\":\"ERROR\"")
+                ? (text.Contains("invalid_scope") ? "REFUSED" : "ERROR")
+                : "ALLOWED";
+            Console.WriteLine($"[{string.Join("+", scopes),-14}] {verdict}  {Truncate(text, 160)}");
+        }
+        catch (OperationCanceledException)
+        {
+            Console.WriteLine($"[{string.Join("+", scopes),-14}] no reply within 45s (dialog left open?)");
+        }
+    }
 }
 
 // Lists guilds and their voice channels, printing the raw payload beside the parsed

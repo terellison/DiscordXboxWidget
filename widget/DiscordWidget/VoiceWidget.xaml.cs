@@ -32,6 +32,13 @@ namespace DiscordWidget
 
             _widget = e.Parameter as XboxGameBarWidget;
 
+            if (_widget != null)
+            {
+                // Game Bar owns the gear in the title bar and only tells us it was pressed;
+                // opening the settings widget is our job.
+                _widget.SettingsClicked += OnSettingsClicked;
+            }
+
             ViewModel = new WidgetViewModel(Dispatcher, App.Session);
             ViewModel.VoicePresenceChanged += OnVoicePresenceChanged;
             Bindings.Update();
@@ -51,7 +58,25 @@ namespace DiscordWidget
             }
 
             CompleteVoiceActivity();
-            _widget = null;
+
+            if (_widget != null)
+            {
+                _widget.SettingsClicked -= OnSettingsClicked;
+                _widget = null;
+            }
+        }
+
+        private async void OnSettingsClicked(XboxGameBarWidget sender, object args)
+        {
+            try
+            {
+                await sender.ActivateSettingsAsync();
+            }
+            catch (Exception ex)
+            {
+                // Raised from a Game Bar callback, so an escape here would crash the widget.
+                WidgetLog.Write("Could not open the settings widget", ex);
+            }
         }
 
         private void OnVoicePresenceChanged(object sender, bool inVoice)
@@ -116,6 +141,11 @@ namespace DiscordWidget
         private async void OnLeave(object sender, RoutedEventArgs e)
         {
             if (ViewModel != null) await ViewModel.LeaveAsync();
+        }
+
+        private async void OnReload(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null) await ViewModel.ReconnectAsync();
         }
 
         private async void OnBrowse(object sender, RoutedEventArgs e)

@@ -60,6 +60,35 @@ internal sealed class BridgeConfig
 
     private const string Placeholder = "YOUR_DISCORD_APPLICATION_ID";
 
+    /// <summary>
+    /// Writes the application id, rewriting the whole file so the guidance block stays
+    /// present for anyone who opens it by hand later.
+    /// </summary>
+    public static void Save(string clientId)
+    {
+        var trimmed = (clientId ?? string.Empty).Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            throw new ArgumentException("An application id is required.", nameof(clientId));
+
+        // Application ids are snowflakes. Rejecting obvious nonsense here turns a confusing
+        // "Invalid Client ID" from Discord into an immediate, local error message.
+        if (!trimmed.All(char.IsDigit))
+            throw new ArgumentException("An application id is all digits; copy it from the Discord Developer Portal.");
+
+        System.IO.Directory.CreateDirectory(Directory);
+        File.WriteAllText(Path_, JsonSerializer.Serialize(
+            new { _readme = Guidance, clientId = trimmed },
+            new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private static readonly string[] Guidance =
+    {
+        "1. Create an application at https://discord.com/developers/applications",
+        "2. On its OAuth2 tab, enable Public Client",
+        "3. On the same tab, add http://localhost as a redirect URI",
+        "4. Paste the Application ID into clientId below",
+    };
+
     private static void WriteTemplate()
     {
         try
@@ -68,20 +97,9 @@ internal sealed class BridgeConfig
 
             // JSON has no comments, so the guidance goes in an ignored field rather than
             // leaving the user a bare key with no idea what belongs in it.
-            var template = new
-            {
-                _readme = new[]
-                {
-                    "1. Create an application at https://discord.com/developers/applications",
-                    "2. On its OAuth2 tab, enable Public Client",
-                    "3. On the same tab, add http://localhost as a redirect URI",
-                    "4. Paste the Application ID into clientId below",
-                },
-                clientId = Placeholder,
-            };
-
             File.WriteAllText(Path_, JsonSerializer.Serialize(
-                template, new JsonSerializerOptions { WriteIndented = true }));
+                new { _readme = Guidance, clientId = Placeholder },
+                new JsonSerializerOptions { WriteIndented = true }));
             Program.Log($"wrote config template to {Path_}");
         }
         catch (Exception ex)

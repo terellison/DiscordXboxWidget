@@ -429,7 +429,15 @@ namespace Discord.Rpc
             catch (Exception ex)
             {
                 SetState(SessionState.Faulted, ex.Message);
-                FaultAllPending(ex);
+            }
+            finally
+            {
+                // Once the read loop stops, nothing can ever complete an outstanding
+                // request. Faulting here rather than only on the exception path matters:
+                // a clean close — Discord quitting, or rejecting the client id — left every
+                // subsequent command waiting forever instead of failing.
+                FaultAllPending(new InvalidOperationException(
+                    "The Discord connection closed before this command completed."));
             }
         }
 

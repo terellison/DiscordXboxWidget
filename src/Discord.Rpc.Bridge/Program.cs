@@ -18,25 +18,18 @@ internal static class Program
         var clientId = ReadOption(args, "--client-id") ?? BridgeConfig.Load().ClientId;
         var selfTest = args.Contains("--selftest", StringComparer.OrdinalIgnoreCase);
 
-        if (string.IsNullOrWhiteSpace(clientId))
+        if (string.IsNullOrWhiteSpace(clientId) && selfTest)
         {
-            Log(BridgeConfig.NotConfiguredMessage);
-
-            if (selfTest)
-            {
-                AttachConsole(AttachParentProcess);
-                Console.WriteLine(BridgeConfig.NotConfiguredMessage);
-                return 1;
-            }
-
-            // Still serve the AppService so the widget can show why it cannot work. Exiting
-            // here would look identical to a bridge that never launched, and the widget
-            // would report a launch timeout instead of something actionable.
-            return await RunReportingOnlyAsync(BridgeConfig.NotConfiguredMessage);
+            AttachConsole(AttachParentProcess);
+            Console.WriteLine(BridgeConfig.NotConfiguredMessage);
+            return 1;
         }
 
+        // An unconfigured bridge still runs the full AppService. It reports the problem as
+        // session state, and keeps serving setConfig so the settings widget can fix it —
+        // which it could not do if the bridge refused to start without configuration.
         using var cts = new CancellationTokenSource();
-        using var host = new BridgeHost(clientId!);
+        using var host = new BridgeHost(clientId);
 
         if (selfTest)
         {
@@ -130,6 +123,26 @@ internal static class Program
                 Console.WriteLine("[skip] not in a voice channel; joinChannel not exercised");
             }
 
+            // Config surface, which the settings widget drives. setConfig writes the same id
+            // back, so this exercises the write and the reconnect without changing anything.
+            var cfg = await host.ExecuteAsync(BridgeProtocol.CmdGetConfig, null, false, cancellationToken);
+            Console.WriteLine($"[getConfig] {cfg}");
+
+            using (var doc = System.Text.Json.JsonDocument.Parse(cfg))
+            {
+                var configuredId = doc.RootElement.GetProperty("clientId").GetString();
+                if (!string.IsNullOrEmpty(configuredId))
+                {
+                    await host.ExecuteAsync(BridgeProtocol.CmdSetConfig, configuredId, false, cancellationToken);
+                    Console.WriteLine("[ok] setConfig round-trip (same id, reconnected)");
+                }
+            }
+
+            await host.ExecuteAsync(BridgeProtocol.CmdReconnect, null, false, cancellationToken);
+            var reconnected = BridgePayloads.ReadVoiceSettings(
+                await host.ExecuteAsync(BridgeProtocol.CmdGetVoiceSettings, null, false, cancellationToken));
+            Console.WriteLine($"[ok] reconnect, session usable afterwards (muted={reconnected.IsMuted})");
+
             Console.WriteLine("self-test complete");
             return 0;
         }
@@ -138,28 +151,6 @@ internal static class Program
             Console.WriteLine($"[FAIL] {ex.GetType().Name}: {ex.Message}");
             return 1;
         }
-    }
-
-    /// <summary>
-    /// Serves the AppService solely to tell the widget why it cannot work. Without this the
-    /// widget waits out its launch timeout and reports that the bridge failed to start,
-    /// which is both wrong and unactionable.
-    /// </summary>
-    private static async Task<int> RunReportingOnlyAsync(string message)
-    {
-        try
-        {
-            using var cts = new CancellationTokenSource();
-            using var host = new BridgeHost(string.Empty);
-            using var bridge = new AppServiceBridge(host) { StartupFault = message };
-            await bridge.RunAsync(cts.Token);
-        }
-        catch (Exception ex)
-        {
-            Log($"reporting-only bridge failed: {ex}");
-        }
-
-        return 1;
     }
 
     private static string? ReadOption(string[] args, string name)

@@ -95,6 +95,12 @@ which is how the local participant is identified in the list.
 Dropping to `rpc.voice.read` + `rpc.voice.write` alone is possible only by giving up channel
 navigation — the case `SessionCapabilities.ChannelNavigation` isolates.
 
+> **The application must be personally owned, not team-owned.** A team-owned application is
+> refused the `rpc` scope outright: `AUTHORIZE` returns `invalid_scope`, while `identify`
+> from the same account on the same application succeeds. Since app verification requires a
+> Team, verification and RPC access cannot both be had. This is undocumented; see
+> [the roadmap](roadmap.md#settled-users-supply-their-own-application-id) for the measurements.
+
 ### No client secret
 
 The token exchange uses **PKCE**. `AUTHORIZE` carries a `code_challenge` and the exchange
