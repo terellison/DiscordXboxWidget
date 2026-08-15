@@ -1,12 +1,110 @@
 # DiscordXboxWidget
 
-A Discord voice widget for the Xbox Game Bar: see who's in your channel, who's talking,
-mute/deafen, and switch channels without leaving the game.
+Discord voice controls inside the Xbox Game Bar. See who's in your channel, who's talking,
+mute and deafen yourself, and hop between channels — without alt-tabbing out of a game.
+
+![The widget open in Game Bar, showing a voice channel with participants and a speaking indicator](docs/images/hero.png)
+
+## What it does
+
+- **Live participant list** with avatars, server nicknames, and mute/deafen state
+- **Speaking indicator** — a ring lights around whoever is talking
+- **Mute and deafen** yourself without switching windows
+- **Channel switching** — browse your servers and jump to another voice channel
+
+![The channel picker showing the server list](docs/images/channel-picker.png)
+
+## Requirements
+
+- Windows 10 1903 (build 18362) or later
+- The **Discord desktop client** running (the web app does not expose the local RPC socket)
+
+## Install
+
+### 1. Trust the signing certificate
+
+Releases are signed with a self-signed certificate, so Windows needs to be told to trust it
+before it will install the package. Download `DiscordXboxWidget.cer` from the
+[latest release](https://github.com/terellison/DiscordXboxWidget/releases/latest) and, in an
+**elevated** PowerShell:
+
+```bash
+Import-Certificate -FilePath .\DiscordXboxWidget.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+```
+
+This project cannot be distributed through the Microsoft Store (see
+[Distribution](#distribution)), so there is no CA-issued signature to fall back on. Inspect
+the certificate first if you would rather not take that on trust.
+
+### 2. Install the package
+
+Download the `.msix` from the same release and double-click it, or:
+
+```bash
+Add-AppxPackage .\DiscordXboxWidget_0.1.0.0_x64.msix
+```
+
+### 3. Open it
+
+Press **Win+G**, open the widget menu, and pick **Discord Voice**.
+
+![The Game Bar widget menu with Discord Voice listed](docs/images/gamebar-widget-menu.png)
+
+On first connect Discord shows a consent dialog asking to authorize the application. Accept
+it once; the token is cached (DPAPI-encrypted, per user) and the prompt will not reappear.
+
+That should be everything. If the widget instead reports **"This Discord account is not
+authorized for the built-in application"**, carry on to step 4.
+
+### 4. Only if step 3 said you are not authorized
+
+Discord restricts the `rpc` scope to an application's owner plus a 50-slot tester allowlist,
+unless the application is approved for general RPC access. If the shipped application does
+not hold that approval, point the widget at one you register yourself — a two-minute job,
+and it means you grant permissions to an app **you** control.
+
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and
+   click **New Application**
+2. Open the **OAuth2** tab
+3. Enable **Public Client**
+4. Add `http://localhost` under **Redirects** and save
+5. Copy the **Application ID**
+
+![The OAuth2 tab with Public Client enabled and the localhost redirect added](docs/images/discord-oauth2-setup.png)
+
+Then open `%LOCALAPPDATA%\DiscordXboxWidget\config.json` — the widget writes a template
+there on first launch — and set `clientId`:
+
+```json
+{
+  "clientId": "123456789012345678"
+}
+```
+
+Reopen the widget. This overrides the built-in application permanently, so you only do it
+once.
+
+### If something goes wrong
+
+The widget shows the reason in place of the channel name. Two logs carry the detail:
+
+```bash
+type "$env:LOCALAPPDATA\DiscordXboxWidget\bridge.log"
+```
+
+```bash
+Get-ChildItem "$env:LOCALAPPDATA\Packages\DiscordXboxWidget_*\LocalState\widget.log"
+```
+
+| Symptom | Cause |
+|---|---|
+| "not authorized for the built-in application" | Do step 4 — register your own application |
+| `invalid_client` during authorization | **Public Client** not enabled on your app's OAuth2 tab |
+| Widget missing from the Win+G menu | Package not installed, or Game Bar needs restarting |
+| Empty participant list | Discord desktop client is not running |
+| Stuck on "Connecting" | The bridge did not start; check `bridge.log` |
 
 ## Status
-
-Working in Game Bar: channel name, participant list with avatars, live speaking rings,
-mute/deafen, and a server/channel picker.
 
 | Component | State |
 |---|---|
@@ -15,8 +113,7 @@ mute/deafen, and a server/channel picker.
 | `Discord.Rpc.Harness` — console test rig | All modes passing |
 | `DiscordWidget` — UWP Game Bar widget | Runs in Game Bar |
 
-Not verified: `joinChannel` end to end (the self-test skips it rather than dragging you
-into a channel), and the default-avatar fallback visually.
+Not covered yet: push-to-talk, screen share, text chat, and any Discord surface beyond voice.
 
 ## Architecture
 

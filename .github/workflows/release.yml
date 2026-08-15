@@ -108,6 +108,23 @@ jobs:
           if (-not $files) { throw "No package produced. Check the packaging step output." }
 
           $files | ForEach-Object { Copy-Item $_.FullName $out }
+
+          # Publish the public half of the signing certificate alongside the package.
+          # Installing a self-signed MSIX requires trusting the certificate first, so a
+          # release without it is not installable. Derived from the PFX rather than
+          # committed, so the two can never drift apart.
+          $pfx = '${{ steps.signing.outputs.pfx }}'
+          if ($pfx -and (Test-Path $pfx)) {
+            $pw = ConvertTo-SecureString '${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}' -AsPlainText -Force
+            $cert = Get-PfxCertificate -FilePath $pfx -Password $pw
+            [IO.File]::WriteAllBytes(
+              (Join-Path $out 'DiscordXboxWidget.cer'),
+              $cert.Export([Security.Cryptography.X509Certificates.X509ContentType]::Cert))
+            Write-Host "exported public certificate: $($cert.Subject)"
+          } else {
+            Write-Host "::warning::Unsigned build - no certificate to publish, package will not install."
+          }
+
           Get-ChildItem $out | ForEach-Object { Write-Host "packaged: $($_.Name) ($($_.Length) bytes)" }
 
       - uses: actions/upload-artifact@v7

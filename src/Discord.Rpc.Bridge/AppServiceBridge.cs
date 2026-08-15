@@ -17,6 +17,12 @@ internal sealed class AppServiceBridge : IDisposable
     private readonly TaskCompletionSource<object?> _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private AppServiceConnection? _connection;
 
+    /// <summary>
+    /// Replaces Discord's own wording when it refuses the rpc scope. Code 4006 reads as an
+    /// opaque authorization failure; this is where the actionable explanation goes.
+    /// </summary>
+    public string? ScopeDenialHint { get; init; }
+
     public AppServiceBridge(BridgeHost host)
     {
         _host = host;
@@ -42,7 +48,23 @@ internal sealed class AppServiceBridge : IDisposable
 
         // Connect to Discord only after the channel to the widget exists, so the state and
         // channel events raised during connect are not dropped on the floor.
-        await _host.ConnectAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _host.ConnectAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (!(ex is OperationCanceledException))
+        {
+            // Report the reason through the open channel rather than exiting. A bridge that
+            // dies here looks identical to one that never started, so the widget would show
+            // a launch timeout instead of "Discord isn't running" or a scope refusal.
+            Program.Log($"connect to Discord failed: {ex}");
+
+            var detail = ex is DiscordRpcException rpc && rpc.IsScopeDenial && ScopeDenialHint != null
+                ? ScopeDenialHint
+                : ex.Message;
+
+            PushFault(detail);
+        }
 
         using (cancellationToken.Register(() => _closed.TrySetResult(null)))
         {
@@ -96,6 +118,12 @@ internal sealed class AppServiceBridge : IDisposable
             deferral.Complete();
         }
     }
+
+    /// <summary>Pushes a Faulted state so the widget can display why it is not working.</summary>
+    private void PushFault(string detail) =>
+        OnHostEvent(
+            BridgeProtocol.EvtState,
+            BridgePayloads.WriteState(SessionState.Faulted, detail, SessionCapabilities.None, null));
 
     private async void OnHostEvent(string eventName, string payload)
     {

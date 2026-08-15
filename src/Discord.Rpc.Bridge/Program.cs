@@ -5,8 +5,9 @@ namespace Discord.Rpc.Bridge;
 internal static class Program
 {
     /// <summary>
-    /// Fallback so the self-test is runnable without arguments. In normal operation the
-    /// widget passes --client-id, keeping the portal application id defined in one place.
+    /// The application shipped with the package. Whether this works for users other than
+    /// its author depends on Discord approving it for general RPC access; config.json
+    /// overrides it either way. Not a secret — application ids are public.
     /// </summary>
     private const string DefaultClientId = "1537284928369074236";
 
@@ -18,7 +19,12 @@ internal static class Program
     [STAThread]
     private static async Task<int> Main(string[] args)
     {
-        var clientId = ReadOption(args, "--client-id") ?? DefaultClientId;
+        // config.json overrides the built-in id; --client-id overrides both, for the
+        // self-test and diagnostics. See BridgeConfig for why the default may or may not
+        // work for users other than its author.
+        var overrideId = ReadOption(args, "--client-id") ?? BridgeConfig.Load().ClientId;
+        var clientId = overrideId ?? DefaultClientId;
+        var usingDefault = overrideId is null;
         var selfTest = args.Contains("--selftest", StringComparer.OrdinalIgnoreCase);
 
         using var cts = new CancellationTokenSource();
@@ -28,13 +34,19 @@ internal static class Program
         {
             // WinExe has no console of its own; borrow the launching shell's.
             AttachConsole(AttachParentProcess);
+            Console.WriteLine($"client id {clientId} (source: {(usingDefault ? "built-in default" : "config.json")})");
             return await SelfTestAsync(host, cts.Token);
         }
 
         try
         {
-            Log($"bridge starting (clientId={clientId})");
-            using var bridge = new AppServiceBridge(host);
+            Log($"bridge starting (clientId={clientId}, source={(usingDefault ? "built-in" : "config")})");
+            using var bridge = new AppServiceBridge(host)
+            {
+                // Only meaningful for the built-in app. If the user supplied their own id
+                // and it is refused, telling them to supply their own would be nonsense.
+                ScopeDenialHint = usingDefault ? BridgeConfig.ScopeDeniedOnDefaultAppMessage : null,
+            };
             await bridge.RunAsync(cts.Token);
             Log("bridge exited normally");
             return 0;
