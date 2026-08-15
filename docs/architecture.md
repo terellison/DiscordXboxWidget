@@ -177,13 +177,51 @@ and keeps `widget.log` where it was.
 
 ## Distribution
 
-Sideload only, for two independent reasons:
-
-- Discord's `rpc` scope restriction, above
-- `runFullTrust` is a restricted capability requiring Microsoft Store onboarding review
+Sideload only. The reason is Discord's `rpc` scope restriction, above — not anything about
+the packaging.
 
 Packages are signed with a self-signed certificate whose subject must match the manifest
 `Publisher` exactly, as Windows renders it. Generate the certificate first and copy its
 rendered subject into the manifest, not the other way round — Windows canonicalises
 distinguished names, and a mismatch produces a package that builds and signs but will not
 install.
+
+An unpackaged registration blocks a packaged install of the same identity:
+`Add-AppxPackage` fails with `0x80073CFB`, *"the current user has already installed an
+unpackaged version of this app"*. Anyone who has deployed the widget project from Visual
+Studio has to `Remove-AppxPackage` before a release will install over it.
+
+### Microsoft Store
+
+Not viable, and the obstacle is not the one it first appears to be.
+
+**`runFullTrust` is not the blocker.** It is a restricted capability and needs justifying at
+submission, but launching a full-trust companion process is the standard Desktop Bridge
+pattern and is routinely approved.
+
+**The `rpc` scope is the blocker.** It is limited to the application owner plus a 50-slot
+tester allowlist. A Store customer authorizing a shipped application id is neither, so
+`AUTHORIZE` refuses them — the `4006 / not authorized` row in the README's troubleshooting
+table. A Store build with an id compiled in would work perfectly for the developer and fail
+for every single customer, which is the worst shape a defect can take: it passes local
+testing by construction.
+
+Injecting the id from a CI secret does not change this. It also does not make the id secret
+— it moves it from the repository into the shipped binary, where `strings` recovers it. The
+same reasoning already applied to the client secret applies here.
+
+**Reserving a Store name reassigns package identity.** Partner Center issues an
+`Identity/Name` such as `12345Publisher.AppName` and a `Publisher` of `CN=<GUID>`, and
+associating the project rewrites the manifest with them. That changes the
+PackageFamilyName, so a Store build and a sideload build are two unrelated apps: both can be
+installed at once, and Game Bar lists both widgets. If this is ever revisited, the Store
+identity belongs in a separate configuration rather than replacing the identity above.
+`Properties/DisplayName` must also match the reserved name exactly.
+
+**Naming.** A name that leads with someone else's trademark — *Xbox*, *Discord* — invites
+rejection and contradicts [the affiliation disclaimer](terms-of-service.md). A trailing
+descriptive "for X" is the conventional construction.
+
+What would unblock the Store is Discord approving general RPC access. Discord publishes no
+route to request it, and app verification, the path that looks like it should lead there,
+requires a Team — which [removes `rpc` entirely](roadmap.md#settled-users-supply-their-own-application-id).
