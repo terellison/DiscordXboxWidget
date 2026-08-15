@@ -130,6 +130,8 @@ if you are building anything similar: [Architecture](docs/architecture.md).
 | [Development](docs/development.md) | Building, tests, the Discord harness, CI/CD, signing |
 | [Game Bar notes](docs/game-bar-notes.md) | Platform traps, several contradicting Microsoft's docs |
 | [Roadmap](docs/roadmap.md) | Known gaps and what is deliberately not planned |
+| [Privacy policy](docs/privacy-policy.md) | What the app touches — it all stays on your PC |
+| [Terms of service](docs/terms-of-service.md) | Licence, no warranty, no affiliation with Discord or Microsoft |
 
 ## Contributing
 
