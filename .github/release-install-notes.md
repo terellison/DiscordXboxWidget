@@ -23,5 +23,10 @@ Add-AppxPackage -Path .\DiscordWidget_0.1.0.0_x64.msix -DependencyPath `
 Then press **Win+G** and pick **Discord Voice** from the widget menu. The Discord desktop
 client must be running.
 
-Full instructions, including what to do if Discord refuses the built-in application, are in
-the [README](https://github.com/terellison/DiscordXboxWidget#install).
+**You will also need to register your own Discord application** — a one-time, two-minute
+step. No application ID ships with the widget, because Discord's Developer Terms forbid
+embedding developer credentials in open source projects. The widget writes a config template
+on first launch and tells you what to do.
+
+Full instructions are in the
+[README](https://github.com/terellison/DiscordXboxWidget#install).

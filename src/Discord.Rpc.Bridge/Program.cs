@@ -4,13 +4,6 @@ namespace Discord.Rpc.Bridge;
 
 internal static class Program
 {
-    /// <summary>
-    /// The application shipped with the package. Whether this works for users other than
-    /// its author depends on Discord approving it for general RPC access; config.json
-    /// overrides it either way. Not a secret — application ids are public.
-    /// </summary>
-    private const string DefaultClientId = "1537284928369074236";
-
     [DllImport("kernel32.dll")]
     private static extern bool AttachConsole(int processId);
 
@@ -19,34 +12,44 @@ internal static class Program
     [STAThread]
     private static async Task<int> Main(string[] args)
     {
-        // config.json overrides the built-in id; --client-id overrides both, for the
-        // self-test and diagnostics. See BridgeConfig for why the default may or may not
-        // work for users other than its author.
-        var overrideId = ReadOption(args, "--client-id") ?? BridgeConfig.Load().ClientId;
-        var clientId = overrideId ?? DefaultClientId;
-        var usingDefault = overrideId is null;
+        // There is no built-in application id, and there deliberately cannot be one:
+        // Discord's Developer Terms name the Application ID as a developer credential and
+        // forbid embedding credentials in open source projects. Each user supplies theirs.
+        var clientId = ReadOption(args, "--client-id") ?? BridgeConfig.Load().ClientId;
         var selfTest = args.Contains("--selftest", StringComparer.OrdinalIgnoreCase);
 
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            Log(BridgeConfig.NotConfiguredMessage);
+
+            if (selfTest)
+            {
+                AttachConsole(AttachParentProcess);
+                Console.WriteLine(BridgeConfig.NotConfiguredMessage);
+                return 1;
+            }
+
+            // Still serve the AppService so the widget can show why it cannot work. Exiting
+            // here would look identical to a bridge that never launched, and the widget
+            // would report a launch timeout instead of something actionable.
+            return await RunReportingOnlyAsync(BridgeConfig.NotConfiguredMessage);
+        }
+
         using var cts = new CancellationTokenSource();
-        using var host = new BridgeHost(clientId);
+        using var host = new BridgeHost(clientId!);
 
         if (selfTest)
         {
             // WinExe has no console of its own; borrow the launching shell's.
             AttachConsole(AttachParentProcess);
-            Console.WriteLine($"client id {clientId} (source: {(usingDefault ? "built-in default" : "config.json")})");
+            Console.WriteLine($"client id {clientId}");
             return await SelfTestAsync(host, cts.Token);
         }
 
         try
         {
-            Log($"bridge starting (clientId={clientId}, source={(usingDefault ? "built-in" : "config")})");
-            using var bridge = new AppServiceBridge(host)
-            {
-                // Only meaningful for the built-in app. If the user supplied their own id
-                // and it is refused, telling them to supply their own would be nonsense.
-                ScopeDenialHint = usingDefault ? BridgeConfig.ScopeDeniedOnDefaultAppMessage : null,
-            };
+            Log($"bridge starting (clientId={clientId})");
+            using var bridge = new AppServiceBridge(host);
             await bridge.RunAsync(cts.Token);
             Log("bridge exited normally");
             return 0;
@@ -135,6 +138,28 @@ internal static class Program
             Console.WriteLine($"[FAIL] {ex.GetType().Name}: {ex.Message}");
             return 1;
         }
+    }
+
+    /// <summary>
+    /// Serves the AppService solely to tell the widget why it cannot work. Without this the
+    /// widget waits out its launch timeout and reports that the bridge failed to start,
+    /// which is both wrong and unactionable.
+    /// </summary>
+    private static async Task<int> RunReportingOnlyAsync(string message)
+    {
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            using var host = new BridgeHost(string.Empty);
+            using var bridge = new AppServiceBridge(host) { StartupFault = message };
+            await bridge.RunAsync(cts.Token);
+        }
+        catch (Exception ex)
+        {
+            Log($"reporting-only bridge failed: {ex}");
+        }
+
+        return 1;
     }
 
     private static string? ReadOption(string[] args, string name)

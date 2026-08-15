@@ -48,24 +48,12 @@ The framework packages matter: Windows cannot fetch them from the Store for a si
 app, and without them the install fails with `0x80073CF3`. If your machine already has them,
 the extra arguments are harmless.
 
-### 3. Open it
+### 3. Register a Discord application
 
-Press **Win+G**, open the widget menu, and pick **Discord Voice**.
-
-![The Game Bar widget menu with Discord Voice listed](docs/images/gamebar-widget-menu.png)
-
-On first connect Discord shows a consent dialog asking to authorize the application. Accept
-it once; the token is cached (DPAPI-encrypted, per user) and the prompt will not reappear.
-
-That should be everything. If the widget instead reports **"This Discord account is not
-authorized for the built-in application"**, carry on to step 4.
-
-### 4. Only if step 3 said you are not authorized
-
-Discord restricts the `rpc` scope to an application's owner plus a 50-slot tester allowlist,
-unless the application is approved for general RPC access. If the shipped application does
-not hold that approval, point the widget at one you register yourself — a two-minute job,
-and it means you grant permissions to an app **you** control.
+A two-minute, one-time step. No application ID is shipped with the widget — Discord's
+[Developer Terms](https://support-dev.discord.com/hc/en-us/articles/8562894815383) classify it
+as a developer credential and forbid embedding those in open source projects. The upside is
+that you grant permissions to an application **you** own rather than to someone else's.
 
 1. Go to the [Discord Developer Portal](https://discord.com/developers/applications) and
    click **New Application**
@@ -76,8 +64,14 @@ and it means you grant permissions to an app **you** control.
 
 ![The OAuth2 tab with Public Client enabled and the localhost redirect added](docs/images/discord-oauth2-setup.png)
 
-Then open `%LOCALAPPDATA%\DiscordXboxWidget\config.json` — the widget writes a template
-there on first launch — and set `clientId`:
+### 4. Point the widget at it
+
+Press **Win+G**, open the widget menu, and pick **Discord Voice**.
+
+![The Game Bar widget menu with Discord Voice listed](docs/images/gamebar-widget-menu.png)
+
+The first launch writes a template to `%LOCALAPPDATA%\DiscordXboxWidget\config.json` and the
+widget will tell you it has no application configured. Open that file and set `clientId`:
 
 ```json
 {
@@ -85,8 +79,8 @@ there on first launch — and set `clientId`:
 }
 ```
 
-Reopen the widget. This overrides the built-in application permanently, so you only do it
-once.
+Reopen the widget. Discord shows a consent dialog asking you to authorize your application —
+accept it once, and the token is cached DPAPI-encrypted so the prompt will not reappear.
 
 ### If something goes wrong
 
@@ -102,8 +96,9 @@ Get-ChildItem "$env:LOCALAPPDATA\Packages\DiscordXboxWidget_*\LocalState\widget.
 
 | Symptom | Cause |
 |---|---|
-| "not authorized for the built-in application" | Do step 4 — register your own application |
+| "No Discord application configured" | Step 4 — set `clientId` in `config.json` |
 | `invalid_client` during authorization | **Public Client** not enabled on your app's OAuth2 tab |
+| 4006 / not authorized | The Discord account in use does not own the application from step 3 |
 | Widget missing from the Win+G menu | Package not installed, or Game Bar needs restarting |
 | Empty participant list | Discord desktop client is not running |
 | Stuck on "Connecting" | The bridge did not start; check `bridge.log` |

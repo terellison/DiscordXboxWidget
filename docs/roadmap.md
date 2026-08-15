@@ -36,12 +36,14 @@ Discord keybind, so it has not been built.
   hand-editing `config.json`
 - Remember recent channels for faster switching than browsing the full server list
 
-## Open question
+## Settled: users supply their own application id
 
-Whether Discord's app verification unlocks general RPC access. If it does, the built-in
-application id works for everyone and step 4 of the install disappears. If it does not, users
-continue registering their own application.
+This was briefly an open question — whether Discord's app verification would unlock general
+RPC access, letting a shipped application id serve everyone.
 
-The test is unambiguous: have someone who is **not** on the tester allowlist install a
-release and try it without configuring anything. A 4006 means verification did not grant RPC
-access. See [architecture](architecture.md#which-application-id-is-used).
+It is moot. Discord's Developer Terms §2(d) classify the Application ID as a developer
+credential and forbid embedding developer credentials in open source projects, so a built-in
+id would not be permissible even if verification granted the scope. Registration is a
+one-time two-minute step, and it means users authorize an application they control.
+
+Verification remains worth completing for its own sake, but it does not change the install.

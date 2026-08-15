@@ -18,10 +18,11 @@ internal sealed class AppServiceBridge : IDisposable
     private AppServiceConnection? _connection;
 
     /// <summary>
-    /// Replaces Discord's own wording when it refuses the rpc scope. Code 4006 reads as an
-    /// opaque authorization failure; this is where the actionable explanation goes.
+    /// When set, the bridge serves the AppService purely to report this message and never
+    /// attempts Discord. Used when no application id is configured, so the widget explains
+    /// the problem instead of showing a launch timeout.
     /// </summary>
-    public string? ScopeDenialHint { get; init; }
+    public string? StartupFault { get; init; }
 
     public AppServiceBridge(BridgeHost host)
     {
@@ -46,9 +47,13 @@ internal sealed class AppServiceBridge : IDisposable
         if (status != AppServiceConnectionStatus.Success)
             throw new InvalidOperationException($"Could not open AppService '{BridgeProtocol.AppServiceName}': {status}");
 
+        if (StartupFault != null)
+        {
+            PushFault(StartupFault);
+        }
         // Connect to Discord only after the channel to the widget exists, so the state and
         // channel events raised during connect are not dropped on the floor.
-        try
+        else try
         {
             await _host.ConnectAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -58,12 +63,7 @@ internal sealed class AppServiceBridge : IDisposable
             // dies here looks identical to one that never started, so the widget would show
             // a launch timeout instead of "Discord isn't running" or a scope refusal.
             Program.Log($"connect to Discord failed: {ex}");
-
-            var detail = ex is DiscordRpcException rpc && rpc.IsScopeDenial && ScopeDenialHint != null
-                ? ScopeDenialHint
-                : ex.Message;
-
-            PushFault(detail);
+            PushFault(ex.Message);
         }
 
         using (cancellationToken.Register(() => _closed.TrySetResult(null)))

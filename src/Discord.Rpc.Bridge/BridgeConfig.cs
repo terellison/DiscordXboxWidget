@@ -6,16 +6,15 @@ namespace Discord.Rpc.Bridge;
 /// Per-user configuration, read from %LOCALAPPDATA%\DiscordXboxWidget\config.json.
 /// </summary>
 /// <remarks>
-/// A built-in application id ships as the default, and this file overrides it.
+/// The Discord application id is supplied by the user and cannot be shipped in the package.
+/// Discord's Developer Terms of Service name the Application ID as a developer credential
+/// and state that developer credentials may not be embedded in open source projects, so a
+/// built-in default would be a licence violation regardless of whether it worked.
 ///
-/// Whether the default works for anyone other than its author depends on Discord: the rpc
-/// scope is restricted to an application's owner plus its 50-slot tester allowlist unless
-/// the app is approved for general RPC access. If the shipped app holds that approval the
-/// default works for everybody and this file is never needed; if it does not, users point
-/// it at an application they registered themselves.
-///
-/// Supporting both means the package does not have to be rebuilt when that answer changes,
-/// and users who would rather grant scopes to their own app can always do so.
+/// It would mostly not work anyway: the rpc scope is restricted to an application's owner
+/// plus its 50-slot tester allowlist unless approved for general RPC access. The two
+/// constraints point the same way, and the result is better for users, who grant scopes to
+/// an application they control rather than to someone else's.
 /// </remarks>
 internal sealed class BridgeConfig
 {
@@ -91,13 +90,9 @@ internal sealed class BridgeConfig
         }
     }
 
-    /// <summary>
-    /// Shown when Discord refuses the scope for the built-in application. That means this
-    /// account is neither its owner nor on its tester allowlist, so the fix is to register
-    /// an application of their own rather than anything the user did wrong locally.
-    /// </summary>
-    public static string ScopeDeniedOnDefaultAppMessage =>
-        "This Discord account is not authorized for the built-in application. Create your " +
-        $"own at discord.com/developers/applications, enable Public Client on its OAuth2 tab, " +
-        $"add http://localhost as a redirect URI, then set clientId in {Path_}.";
+    /// <summary>Shown in the widget when no application id has been configured.</summary>
+    public static string NotConfiguredMessage =>
+        $"No Discord application configured. Edit {Path_} and set clientId. Create an app at " +
+        "discord.com/developers/applications, enable Public Client on its OAuth2 tab, and add " +
+        "http://localhost as a redirect URI.";
 }

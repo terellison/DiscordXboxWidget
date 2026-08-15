@@ -115,10 +115,19 @@ path was not the shipped path.
 
 ### Which application id is used
 
-`config.json` in the bridge data directory overrides a built-in default. Discord restricts the
-`rpc` scope to an application's owner plus a 50-slot tester allowlist unless the app is
-approved for general RPC access, and publishes no documented way to request that approval.
-Supporting both means the package does not need rebuilding whichever way that lands.
+Solely `clientId` in `%LOCALAPPDATA%\DiscordXboxWidget\config.json`. Nothing is compiled in,
+for two independent reasons that happen to agree:
+
+- Discord's [Developer Terms](https://support-dev.discord.com/hc/en-us/articles/8562894815383)
+  §2(d) name the Application ID as a developer credential and state that developer
+  credentials **may not be embedded in open source projects**. A built-in default would
+  breach that regardless of whether it functioned.
+- It would mostly not function anyway. The `rpc` scope is restricted to an application's
+  owner plus a 50-slot tester allowlist unless approved for general RPC access, and Discord
+  publishes no way to request that approval.
+
+The bridge writes a template on first run and reports the reason through the AppService, so
+an unconfigured install explains itself in the widget rather than failing silently.
 
 ## Distribution
 
