@@ -92,7 +92,11 @@
     <AppxManifest Include="Package.appxmanifest">
       <SubType>Designer</SubType>
     </AppxManifest>
-    <None Include="Properties\Default.rd.xml" />
+    <!-- Must be package content, not None or RdXmlFile. Microsoft.NetNative.targets collects
+         directives from @(AppxPackagePayload) filtered on a .rd.xml suffix, so a file that
+         is not in the package is invisible to the optimizer. Declared as None it was
+         silently ignored and Release warned ILT0027 that no directives existed at all. -->
+    <Content Include="Properties\Default.rd.xml" />
     <Content Include="Assets\**\*.png" />
     <Content Include="GameBar\**\*.png" />
   </ItemGroup>
