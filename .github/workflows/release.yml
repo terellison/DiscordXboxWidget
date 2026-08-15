@@ -19,6 +19,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # Tag annotations are not fetched by a shallow clone, and the release notes are
+          # read from the annotation of the tag being built.
+          fetch-depth: 0
 
       - uses: actions/setup-dotnet@v6
         with:
@@ -132,20 +136,48 @@ jobs:
           name: DiscordXboxWidget-package
           path: artifacts/
 
+      # Release notes come from the tag's own annotation, so they are written once, live in
+      # git, and stay readable with `git show` rather than only on GitHub.
+      - name: Build release notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          $notes = git tag -l --format='%(contents)' $env:GITHUB_REF_NAME
+          if ([string]::IsNullOrWhiteSpace($notes)) {
+            Write-Host "::warning::Tag has no annotation; falling back to install notes only."
+            $notes = ''
+          }
+
+          $install = @'
+
+## Installing
+
+This package is signed with a self-signed certificate, so Windows must be told to trust it
+before it will install. In an **elevated** PowerShell:
+
+```powershell
+Import-Certificate -FilePath .\DiscordXboxWidget.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
+Add-AppxPackage .\DiscordXboxWidget_0.1.0.0_x64.msix
+```
+
+Then press **Win+G** and pick **Discord Voice** from the widget menu. The Discord desktop
+client must be running. Full instructions, including what to do if Discord refuses the
+built-in application, are in the [README](https://github.com/terellison/DiscordXboxWidget#install).
+'@
+
+          $signing = if ('${{ steps.signing.outputs.signed }}' -eq 'true') {
+            "`n_Signed; ``DiscordXboxWidget.cer`` below is the certificate to trust._`n"
+          } else {
+            "`n> **This build is unsigned** and cannot be installed until it is signed.`n"
+          }
+
+          Set-Content release-notes.md -Value ($notes + $install + $signing)
+          Write-Host "--- release notes ---"
+          Get-Content release-notes.md
+
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v3
         with:
           files: artifacts/*
-          generate_release_notes: true
-          body: |
-            Sideload only. This widget cannot be distributed through the Microsoft Store:
-            Discord restricts the `rpc` OAuth scope to the application owner plus its tester
-            allowlist, and `runFullTrust` requires Store onboarding review.
-
-            Requires the Discord desktop client running, and a Discord application with the
-            `PUBLIC_OAUTH2_CLIENT` flag set.
-
-            ${{ steps.signing.outputs.signed == 'true'
-                && 'Signed with the configured certificate.'
-                || '**Unsigned** - no signing certificate was configured, so this package cannot be installed until it is signed.' }}
+          body_path: release-notes.md
