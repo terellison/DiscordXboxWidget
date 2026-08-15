@@ -65,8 +65,8 @@ jobs:
   # The UWP widget needs full MSBuild and the Universal Windows Platform workload. The
   # workload is not guaranteed to be present on the hosted image, so this job installs it
   # if missing rather than failing with a confusing "project could not be loaded".
-  widget:
-    name: Build widget
+  package:
+    name: Build package
     runs-on: windows-latest
 
     steps:
@@ -98,28 +98,61 @@ jobs:
           )
           if ($p.ExitCode -ne 0) { throw "vs_installer exited $($p.ExitCode)" }
 
-      # The bridge must exist before the widget builds: the widget packages its output by
-      # path, and would otherwise produce a package with no full-trust component and no error.
-      - name: Build bridge
-        run: dotnet build src/Discord.Rpc.Bridge/Discord.Rpc.Bridge.csproj -c Release
+      # The packaging project builds the widget and the bridge itself, as project
+      # references, so neither is built separately here.
+      - name: Restore packaging project
+        run: msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj -t:Restore -p:Configuration=Release -p:Platform=x64
 
-      - name: Restore widget
-        run: msbuild widget/DiscordWidget/DiscordWidget.csproj -t:Restore -p:Configuration=Release -p:Platform=x64
+      - name: Build packaging project
+        run: msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj -p:Configuration=Release -p:Platform=x64
 
-      - name: Build widget
-        run: msbuild widget/DiscordWidget/DiscordWidget.csproj -p:Configuration=Release -p:Platform=x64
-
-      - name: Verify the bridge was packaged
+      # The package is assembled from two independent halves, and losing either produces a
+      # package that installs cleanly and does not work. Assert both are present, and that
+      # the manifest's fullTrustProcess path still resolves to a file actually in the
+      # package -- the packaging project derives that path from the bridge project's name,
+      # so renaming the project would silently break the widget's only route to Discord.
+      - name: Verify package contents
         shell: pwsh
         run: |
-          $recipe = "widget/DiscordWidget/bin/x64/Release/DiscordWidget.build.appxrecipe"
-          if (-not (Test-Path $recipe)) { throw "No appxrecipe produced at $recipe" }
+          $msix = @(Get-ChildItem packaging/DiscordXboxWidget/AppPackages -Recurse -Filter *.msix)
+          if ($msix.Count -ne 1) { throw "Expected one .msix, found $($msix.Count)." }
+          $msix = $msix[0]
+          Write-Host "package: $($msix.Name) ($([math]::Round($msix.Length/1MB,1)) MB)"
 
-          [xml]$x = Get-Content $recipe
-          $bridge = $x.Project.ItemGroup.AppxPackagedFile |
-            Where-Object { $_.PackagePath -like 'bridge\*' }
+          Add-Type -AssemblyName System.IO.Compression.FileSystem
+          $zip = [IO.Compression.ZipFile]::OpenRead($msix.FullName)
+          try {
+            $entries = $zip.Entries.FullName
 
-          if (-not $bridge) {
-            throw "Widget packaged without the bridge. This builds and deploys cleanly but cannot reach Discord."
+            $manifest = $zip.GetEntry('AppxManifest.xml')
+            $reader = New-Object IO.StreamReader($manifest.Open())
+            [xml]$m = $reader.ReadToEnd()
+            $reader.Dispose()
+
+            $ns = @{
+              d = 'http://schemas.microsoft.com/appx/manifest/desktop/windows10'
+              f = 'http://schemas.microsoft.com/appx/manifest/foundation/windows10'
+            }
+            $ext = Select-Xml -Xml $m -Namespace $ns `
+              -XPath "//d:Extension[@Category='windows.fullTrustProcess']"
+            if (-not $ext) { throw "Manifest declares no windows.fullTrustProcess extension." }
+
+            $declared = $ext.Node.Executable -replace '\\', '/'
+            if ($entries -notcontains $declared) {
+              throw "Manifest points fullTrustProcess at '$declared', which is not in the package."
+            }
+            Write-Host "bridge present at declared path: $declared"
+
+            # The identity is what makes an install an upgrade instead of a second app.
+            $id = Select-Xml -Xml $m -Namespace $ns -XPath '//f:Identity'
+            if ($id.Node.Name -ne 'DiscordXboxWidget') {
+              throw "Package identity changed to '$($id.Node.Name)'; this orphans existing installs."
+            }
+            Write-Host "identity: $($id.Node.Name) $($id.Node.Version)"
+
+            if ($entries -notcontains 'DiscordWidget.exe') {
+              throw "Widget executable missing from the package."
+            }
+          } finally {
+            $zip.Dispose()
           }
-          Write-Host "Bridge packaged: $($bridge.Count) file(s)"

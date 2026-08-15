@@ -8,6 +8,12 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Discord.Rpc</RootNamespace>
     <AssemblyName>Discord.Rpc</AssemblyName>
+    <!-- Not because this library is architecture-specific: it is not, and the UWP widget
+         still consumes the RID-agnostic build. The packaging project publishes the bridge
+         self-contained, which resolves the whole reference graph for win-x64, and restore
+         only writes that target into project.assets.json if the RID is declared. Without
+         it the packaged build fails with NETSDK1047 while a plain build succeeds. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
 
   <ItemGroup>

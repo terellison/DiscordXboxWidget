@@ -23,9 +23,32 @@ which is why the line above works at all.
 msbuild DiscordXboxWidget.sln -p:Configuration=Debug -p:Platform=x64
 ```
 
-> **In Visual Studio, set the solution platform to x64 before F5.**
-> `Any CPU` has no Build or Deploy entry for the widget, so F5 silently deploys nothing and
-> reports success.
+To produce an installable package, build the packaging project. It builds the widget and the
+bridge itself, as project references, so there is nothing to build first and no ordering to
+get right:
+
+```bash
+msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj -t:Restore -p:Configuration=Release -p:Platform=x64
+```
+
+```bash
+msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj -p:Configuration=Release -p:Platform=x64
+```
+
+The msix lands in `packaging/DiscordXboxWidget/AppPackages/`, unsigned unless you pass a
+certificate — see [Signing a package locally](#signing-a-package-locally).
+
+> **In Visual Studio, set the solution platform to x64 and make `DiscordXboxWidget` the
+> startup project before F5.** `Any CPU` has no Build entry for the widget, so it silently
+> builds nothing and reports success. The packaging project is the only one with a Deploy
+> entry: deploying the widget project alone would install a package with no bridge in it.
+
+> **Release only:** the widget compiles through .NET Native, which is the only configuration
+> where `Properties/Default.rd.xml` is consulted. A Debug package proves the layout and the
+> manifest; it does not prove the runtime directives. When checking a change to those, verify
+> the ILC step actually ran — `widget/DiscordWidget/obj/x64/Release/ilc/ilclog.csv` should be
+> freshly written and mention `Default.rd.xml`. An incremental build that skips ILC reports
+> success and emits no warning either way.
 
 ## Tests
 
@@ -106,15 +129,34 @@ incorrect"* with no source and no stack trace.
 mask a test failure:
 
 - **Build and test** — needs only the .NET SDK
-- **Build widget** — full MSBuild, installs the UWP workload if the runner lacks it, and
-  asserts the bridge was actually packaged. A widget packaged without it builds and deploys
-  cleanly and simply cannot reach Discord, so that check is load-bearing.
+- **Build package** — full MSBuild, installs the UWP workload if the runner lacks it, then
+  opens the produced msix and asserts three things: the manifest's `fullTrustProcess` path
+  resolves to a file actually in the package, the widget executable is present, and the
+  package identity is still `DiscordXboxWidget`. All three are load-bearing. A package
+  missing the bridge installs cleanly and cannot reach Discord; a changed identity turns an
+  upgrade into a second, unrelated install.
 
 `release.yml` triggers on a `v*` tag, or manually via `workflow_dispatch` to exercise
 packaging without publishing. It signs with `SIGNING_CERTIFICATE_BASE64` and
 `SIGNING_CERTIFICATE_PASSWORD` when configured, publishes the public certificate alongside
 the package (a self-signed MSIX is not installable without it), and is explicit in the
 release notes when producing an unsigned build.
+
+## Cutting a release
+
+The package filename contains the version, and two files quote it literally. Both describe
+the *published* release, so they change when the release is cut, not before:
+
+1. `packaging/DiscordXboxWidget/Package.appxmanifest` — bump `Version`
+2. `README.md` — the `Add-AppxPackage` command in **Install**
+3. `.github/release-install-notes.md` — the same command
+
+The artifact is named after the packaging project, so it is
+`DiscordXboxWidget_<version>_x64.msix`. Releases up to v0.1.2 were built by the widget
+project and named `DiscordWidget_<version>_x64.msix`; links to those still resolve.
+
+Then tag with `--cleanup=verbatim`, or git strips every `#` heading out of the annotation and
+the release notes arrive as a wall of unformatted text.
 
 ## Signing a package locally
 

@@ -10,12 +10,22 @@ Game Bar
                           └── Discord desktop client
 ```
 
+Both halves ship in one msix, built by the packaging project:
+
+```
+DiscordXboxWidget.msix
+  ├── DiscordWidget.exe            the AppContainer half (entry point)
+  ├── AppxManifest.xml             identity, Game Bar widgets, app service, capabilities
+  └── Discord.Rpc.Bridge\          the full-trust half, self-contained .NET
+```
+
 | Project | Target | Role |
 |---|---|---|
 | `Discord.Rpc` | netstandard2.0 | Protocol, transports, session, bridge payloads |
 | `Discord.Rpc.Bridge` | net9.0-windows | Full-trust host that actually talks to Discord |
 | `Discord.Rpc.Harness` | net9.0 | Console rig for probing Discord directly |
 | `DiscordWidget` | UWP | The Game Bar widget itself |
+| `DiscordXboxWidget` | wapproj | Packaging project: combines the two halves into the msix |
 
 ## Why there is a bridge at all
 
@@ -135,15 +145,42 @@ for two independent reasons that happen to agree:
 The bridge writes a template on first run and reports the reason through the AppService, so
 an unconfigured install explains itself in the widget rather than failing silently.
 
+## Packaging
+
+The msix is built by `packaging/DiscordXboxWidget`, a Windows Application Packaging Project
+that references the widget and the bridge. Before it existed the widget project produced the
+package itself and copied the bridge in through a glob, which worked but emitted `APPX0006`:
+a project declaring `runFullTrust` is expected to be packaged this way.
+
+Three consequences worth knowing, because none of them are obvious from the project file:
+
+**There are two manifests, and only one of them ships.** `packaging/DiscordXboxWidget/Package.appxmanifest`
+is the real one. `widget/DiscordWidget/Package.appxmanifest` exists only because a UWP
+project cannot build without one, and is deliberately minimal — a package feature added
+there is silently absent from the product. Its `Identity` is intentionally different so that
+deploying the widget project alone cannot replace a real install with a bridge-less copy.
+
+**The bridge's path inside the package is derived, not chosen.** A referenced .NET project is
+published into a folder named after the project, so the bridge lives at
+`Discord.Rpc.Bridge\Discord.Rpc.Bridge.exe` and the `windows.fullTrustProcess` extension has
+to match. Renaming the bridge project moves it, and the failure is a widget that installs
+perfectly and never connects. CI asserts the declared path resolves to a file in the package.
+
+**The bridge is published self-contained**, because the packaging project imposes that on
+`.NETCoreApp` references. That is the right answer here anyway: nothing in a sideloaded
+install can resolve a missing shared runtime, and a bridge that cannot start looks exactly
+like a bridge that cannot reach Discord. It costs roughly 33 MB of package size.
+
+Package identity — `Name` and `Publisher` — is unchanged from when the widget project built
+the package. That is what keeps an install an upgrade rather than a second, unrelated app,
+and keeps `widget.log` where it was.
+
 ## Distribution
 
 Sideload only, for two independent reasons:
 
 - Discord's `rpc` scope restriction, above
 - `runFullTrust` is a restricted capability requiring Microsoft Store onboarding review
-
-`APPX0006` at build time is Microsoft advising that a Windows Application Packaging Project
-should produce real sideload packages. See [the roadmap](roadmap.md).
 
 Packages are signed with a self-signed certificate whose subject must match the manifest
 `Publisher` exactly, as Windows renders it. Generate the certificate first and copy its

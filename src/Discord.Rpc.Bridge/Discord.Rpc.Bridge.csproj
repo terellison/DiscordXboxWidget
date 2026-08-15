@@ -14,10 +14,16 @@
     <Platforms>AnyCPU;x64</Platforms>
     <!-- Must match the widget's architecture to be packaged alongside it. -->
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
-    <SelfContained>false</SelfContained>
+    <!-- Self-contained because the package is sideloaded: there is no Store to resolve a
+         shared runtime from, and the widget cannot report a missing one usefully: a
+         framework-dependent bridge that finds no .NET runtime simply fails to start, which
+         surfaces as the widget stuck on "Connecting". It is also what the packaging project
+         imposes on .NETCoreApp references anyway, so declaring it here keeps a direct
+         `dotnet build` and a packaged build producing the same thing, and makes restore
+         fetch the runtime pack that publish needs. -->
+    <SelfContained>true</SelfContained>
     <!-- Pinned explicitly so the path does not gain an extra x64\ segment when built as
-         part of the solution with Platform=x64. The widget packages this directory by
-         path, and a silent move would package the widget with no bridge in it. -->
+         part of the solution with Platform=x64. -->
     <OutputPath>$(MSBuildThisFileDirectory)bin\$(Configuration)\</OutputPath>
     <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
     <AppendRuntimeIdentifierToOutputPath>true</AppendRuntimeIdentifierToOutputPath>
