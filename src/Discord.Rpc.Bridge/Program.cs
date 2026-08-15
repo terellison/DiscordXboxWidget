@@ -83,6 +83,38 @@ internal static class Program
             await host.ExecuteAsync(BridgeProtocol.CmdSetMuted, null, before.IsMuted, cancellationToken);
             Console.WriteLine($"[restore] muted={before.IsMuted}");
 
+            var guildsJson = await host.ExecuteAsync(BridgeProtocol.CmdGetGuilds, null, false, cancellationToken);
+            var guilds = BridgePayloads.ReadGuilds(guildsJson);
+            Console.WriteLine($"[getGuilds] {guilds.Count} server(s)");
+
+            var current = BridgePayloads.ReadChannel(channel);
+
+            // Read-only, so it runs whether or not the user is currently in voice.
+            var probeGuild = current?.GuildId ?? (guilds.Count > 0 ? guilds[0].Id : null);
+            if (probeGuild != null)
+            {
+                var channelsJson = await host.ExecuteAsync(
+                    BridgeProtocol.CmdGetVoiceChannels, probeGuild, false, cancellationToken);
+                var voiceChannels = BridgePayloads.ReadVoiceChannels(channelsJson);
+                Console.WriteLine($"[getVoiceChannels] {voiceChannels.Count} voice channel(s) in server {probeGuild}");
+            }
+
+            if (current?.GuildId != null)
+            {
+                // Joins the channel the user is already in. That exercises
+                // SELECT_VOICE_CHANNEL for real without dragging them out of a call.
+                await host.ExecuteAsync(BridgeProtocol.CmdJoinChannel, current.Id, false, cancellationToken);
+                var rejoined = BridgePayloads.ReadChannel(
+                    await host.ExecuteAsync(BridgeProtocol.CmdGetChannel, null, false, cancellationToken));
+                Console.WriteLine(rejoined?.Id == current.Id
+                    ? "[ok] joinChannel round-trip verified (re-joined current channel)"
+                    : $"[FAIL] joinChannel left us in {rejoined?.Name ?? "<none>"}");
+            }
+            else
+            {
+                Console.WriteLine("[skip] not in a voice channel; joinChannel not exercised");
+            }
+
             Console.WriteLine("self-test complete");
             return 0;
         }

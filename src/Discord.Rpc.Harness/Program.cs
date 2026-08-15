@@ -47,6 +47,10 @@ try
             await MuteDiagAsync(RequireClientId(args), cts.Token);
             break;
 
+        case "channels":
+            await ChannelsAsync(RequireClientId(args), cts.Token);
+            break;
+
         default:
             Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | wsprobe | handshake | watch | toggle");
             return 2;
@@ -182,6 +186,42 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
     await session.ConnectAsync(ct);
     Console.WriteLine("Watching. Ctrl+C to stop.");
     await Task.Delay(Timeout.Infinite, ct);
+}
+
+// Lists guilds and their voice channels, printing the raw payload beside the parsed
+// result so a wrong field shape shows up immediately rather than as an empty picker.
+static async Task ChannelsAsync(string clientId, CancellationToken ct)
+{
+    using var session = new DiscordRpcSession(clientId, new ConsoleTokenProvider(clientId));
+
+    string? lastRaw = null;
+    session.FrameReceived += (_, payload) =>
+    {
+        if (payload.Contains("GET_GUILDS") || payload.Contains("GET_CHANNELS")) lastRaw = payload;
+    };
+
+    await session.ConnectAsync(ct);
+
+    if (!session.Capabilities.HasFlag(SessionCapabilities.ChannelNavigation))
+    {
+        Console.WriteLine("ChannelNavigation not granted; GET_GUILDS requires the full rpc scope.");
+        return;
+    }
+
+    var guilds = await session.GetGuildsAsync(ct);
+    Console.WriteLine($"[raw guilds] {Truncate(lastRaw ?? "<none>", 400)}");
+    Console.WriteLine($"[parsed] {guilds.Count} guild(s)");
+
+    foreach (var guild in guilds)
+    {
+        var channels = await session.GetVoiceChannelsAsync(guild.Id, ct);
+        Console.WriteLine($"  {guild.Name} ({guild.Id}) -> {channels.Count} voice channel(s)");
+        foreach (var channel in channels)
+            Console.WriteLine($"    - {channel.Name}  id={channel.Id}");
+    }
+
+    Console.WriteLine();
+    Console.WriteLine($"[raw last channels] {Truncate(lastRaw ?? "<none>", 500)}");
 }
 
 // Prints every dispatch frame around a self-mute, in one process so there is no timing

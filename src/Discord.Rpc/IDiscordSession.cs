@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -45,6 +46,17 @@ namespace Discord.Rpc
         Task SetMutedAsync(bool muted, CancellationToken cancellationToken);
 
         Task SetDeafenedAsync(bool deafened, CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Servers the user is in. Requires <see cref="SessionCapabilities.ChannelNavigation"/>.
+        /// </summary>
+        Task<IReadOnlyList<GuildSummary>> GetGuildsAsync(CancellationToken cancellationToken);
+
+        /// <summary>
+        /// Voice channels within a server, text channels excluded. Requires
+        /// <see cref="SessionCapabilities.ChannelNavigation"/>.
+        /// </summary>
+        Task<IReadOnlyList<VoiceChannelSummary>> GetVoiceChannelsAsync(string guildId, CancellationToken cancellationToken);
 
         Task JoinVoiceChannelAsync(string channelId, CancellationToken cancellationToken);
 

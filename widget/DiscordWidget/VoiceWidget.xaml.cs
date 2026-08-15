@@ -93,6 +93,19 @@ namespace DiscordWidget
             if (ViewModel != null) await ViewModel.LeaveAsync();
         }
 
+        private async void OnBrowse(object sender, RoutedEventArgs e)
+        {
+            if (ViewModel != null) await ViewModel.BrowseServersAsync();
+        }
+
+        private void OnCancelBrowse(object sender, RoutedEventArgs e) => ViewModel?.CancelBrowsing();
+
+        private async void OnPickerItemClick(object sender, ItemClickEventArgs e)
+        {
+            if (ViewModel != null && e.ClickedItem is PickerItem item)
+                await ViewModel.SelectPickerItemAsync(item);
+        }
+
         // x:Bind function bindings, used instead of converter classes.
         // Must be instance methods: the generated binding code calls them off the page.
         public Visibility Visible(bool value) => value ? Visibility.Visible : Visibility.Collapsed;

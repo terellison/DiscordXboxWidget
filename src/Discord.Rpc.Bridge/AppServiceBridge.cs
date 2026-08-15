@@ -72,7 +72,11 @@ internal sealed class AppServiceBridge : IDisposable
             }
             else
             {
+                // Commands take at most one id, so channelId and guildId collapse into a
+                // single positional argument rather than widening ExecuteAsync per command.
                 var stringArg = message.TryGetValue(BridgeProtocol.ArgChannelId, out var s) ? s as string : null;
+                if (stringArg == null && message.TryGetValue(BridgeProtocol.ArgGuildId, out var g))
+                    stringArg = g as string;
                 var boolArg = message.TryGetValue(BridgeProtocol.ArgValue, out var b) && b is bool flag && flag;
 
                 var payload = await _host.ExecuteAsync(command!, stringArg, boolArg, CancellationToken.None);

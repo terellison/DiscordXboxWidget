@@ -72,6 +72,72 @@ namespace Discord.Rpc.Bridge
                 participants);
         }
 
+        public static string WriteGuilds(IReadOnlyList<GuildSummary> guilds)
+        {
+            using var stream = new System.IO.MemoryStream();
+            using (var w = new Utf8JsonWriter(stream))
+            {
+                w.WriteStartArray();
+                foreach (var g in guilds)
+                {
+                    w.WriteStartObject();
+                    w.WriteString("id", g.Id);
+                    w.WriteString("name", g.Name);
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+            }
+            return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        public static IReadOnlyList<GuildSummary> ReadGuilds(string json)
+        {
+            var guilds = new List<GuildSummary>();
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return guilds;
+
+            foreach (var g in doc.RootElement.EnumerateArray())
+                guilds.Add(new GuildSummary(Str(g, "id") ?? string.Empty, Str(g, "name") ?? "Server"));
+
+            return guilds;
+        }
+
+        public static string WriteVoiceChannels(IReadOnlyList<VoiceChannelSummary> channels)
+        {
+            using var stream = new System.IO.MemoryStream();
+            using (var w = new Utf8JsonWriter(stream))
+            {
+                w.WriteStartArray();
+                foreach (var c in channels)
+                {
+                    w.WriteStartObject();
+                    w.WriteString("id", c.Id);
+                    w.WriteString("name", c.Name);
+                    w.WriteString("guildId", c.GuildId);
+                    w.WriteEndObject();
+                }
+                w.WriteEndArray();
+            }
+            return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+        }
+
+        public static IReadOnlyList<VoiceChannelSummary> ReadVoiceChannels(string json)
+        {
+            var channels = new List<VoiceChannelSummary>();
+            using var doc = JsonDocument.Parse(json);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return channels;
+
+            foreach (var c in doc.RootElement.EnumerateArray())
+            {
+                channels.Add(new VoiceChannelSummary(
+                    Str(c, "id") ?? string.Empty,
+                    Str(c, "name") ?? "Voice",
+                    Str(c, "guildId") ?? string.Empty));
+            }
+
+            return channels;
+        }
+
         public static string WriteVoiceSettings(LocalVoiceSettings settings) =>
             $"{{\"muted\":{(settings.IsMuted ? "true" : "false")},\"deafened\":{(settings.IsDeafened ? "true" : "false")}}}";
 

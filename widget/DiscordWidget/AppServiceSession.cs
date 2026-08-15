@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Discord.Rpc;
@@ -109,6 +110,20 @@ namespace DiscordWidget
         public Task SetDeafenedAsync(bool deafened, CancellationToken cancellationToken) =>
             SendAsync(BridgeProtocol.CmdSetDeafened, deafened, null, cancellationToken);
 
+        public async Task<IReadOnlyList<GuildSummary>> GetGuildsAsync(CancellationToken cancellationToken)
+        {
+            var payload = await SendAsync(BridgeProtocol.CmdGetGuilds, null, null, cancellationToken);
+            return BridgePayloads.ReadGuilds(payload);
+        }
+
+        public async Task<IReadOnlyList<VoiceChannelSummary>> GetVoiceChannelsAsync(
+            string guildId, CancellationToken cancellationToken)
+        {
+            var payload = await SendAsync(
+                BridgeProtocol.CmdGetVoiceChannels, null, guildId, cancellationToken, BridgeProtocol.ArgGuildId);
+            return BridgePayloads.ReadVoiceChannels(payload);
+        }
+
         public Task JoinVoiceChannelAsync(string channelId, CancellationToken cancellationToken) =>
             SendAsync(BridgeProtocol.CmdJoinChannel, null, channelId, cancellationToken);
 
@@ -116,14 +131,15 @@ namespace DiscordWidget
             SendAsync(BridgeProtocol.CmdLeaveChannel, null, null, cancellationToken);
 
         private async Task<string> SendAsync(
-            string command, bool? boolArg, string channelId, CancellationToken cancellationToken)
+            string command, bool? boolArg, string idArg, CancellationToken cancellationToken,
+            string idKey = BridgeProtocol.ArgChannelId)
         {
             var connection = _connection;
             if (connection == null) throw new InvalidOperationException("The Discord bridge is not connected.");
 
             var message = new ValueSet { [BridgeProtocol.KeyCommand] = command };
             if (boolArg.HasValue) message[BridgeProtocol.ArgValue] = boolArg.Value;
-            if (channelId != null) message[BridgeProtocol.ArgChannelId] = channelId;
+            if (idArg != null) message[idKey] = idArg;
 
             var response = await connection.SendMessageAsync(message).AsTask(cancellationToken);
             if (response.Status != AppServiceResponseStatus.Success)

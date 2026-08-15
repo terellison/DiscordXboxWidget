@@ -84,6 +84,63 @@
                     Click="OnLeave"
                     IsEnabled="{x:Bind ViewModel.CanNavigate, Mode=OneWay}"
                     Visibility="{x:Bind Visible(ViewModel.IsInVoice), Mode=OneWay}" />
+            <Button Content="Switch"
+                    Click="OnBrowse"
+                    IsEnabled="{x:Bind ViewModel.CanNavigate, Mode=OneWay}" />
         </StackPanel>
+
+        <!-- Picker overlay. Covers the whole widget rather than sitting alongside: at
+             320px wide there is no room for both, and the list can run to dozens of rows. -->
+        <Grid Grid.Row="0" Grid.RowSpan="4"
+              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
+              Visibility="{x:Bind Visible(ViewModel.IsBrowsing), Mode=OneWay}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0" ColumnSpacing="8" Margin="0,0,0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button Grid.Column="0"
+                        Content="&#xE72B;"
+                        FontFamily="Segoe MDL2 Assets"
+                        Padding="8,4"
+                        Click="OnCancelBrowse"
+                        ToolTipService.ToolTip="Back" />
+                <TextBlock Grid.Column="1"
+                           Text="{x:Bind ViewModel.PickerTitle, Mode=OneWay}"
+                           Style="{StaticResource SubtitleTextBlockStyle}"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
+
+            <ProgressRing Grid.Row="1"
+                          IsActive="{x:Bind ViewModel.IsPickerBusy, Mode=OneWay}"
+                          Visibility="{x:Bind Visible(ViewModel.IsPickerBusy), Mode=OneWay}"
+                          Width="28" Height="28"
+                          VerticalAlignment="Top"
+                          HorizontalAlignment="Center" />
+
+            <ListView Grid.Row="1"
+                      ItemsSource="{x:Bind ViewModel.PickerItems}"
+                      IsItemClickEnabled="True"
+                      ItemClick="OnPickerItemClick"
+                      SelectionMode="None">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="MinHeight" Value="34" />
+                        <Setter Property="Padding" Value="4,2" />
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate x:DataType="local:PickerItem">
+                        <TextBlock Text="{x:Bind Name}" TextTrimming="CharacterEllipsis" />
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+        </Grid>
     </Grid>
 </Page>

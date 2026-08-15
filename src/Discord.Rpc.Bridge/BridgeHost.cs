@@ -84,6 +84,16 @@ internal sealed class BridgeHost : IDisposable
                 await session.LeaveVoiceChannelAsync(cancellationToken).ConfigureAwait(false);
                 return "null";
 
+            case BridgeProtocol.CmdGetGuilds:
+                return BridgePayloads.WriteGuilds(
+                    await session.GetGuildsAsync(cancellationToken).ConfigureAwait(false));
+
+            case BridgeProtocol.CmdGetVoiceChannels:
+                if (string.IsNullOrEmpty(stringArg))
+                    throw new ArgumentException("getVoiceChannels requires a guildId.");
+                return BridgePayloads.WriteVoiceChannels(
+                    await session.GetVoiceChannelsAsync(stringArg!, cancellationToken).ConfigureAwait(false));
+
             default:
                 throw new ArgumentException($"Unknown command '{command}'.");
         }

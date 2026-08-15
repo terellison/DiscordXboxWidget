@@ -61,6 +61,21 @@ namespace DiscordWidget
         public event PropertyChangedEventHandler PropertyChanged;
     }
 
+    /// <summary>One row in the channel picker: either a server, or a voice channel in one.</summary>
+    public sealed class PickerItem
+    {
+        public string Id { get; }
+        public string Name { get; }
+        public bool IsGuild { get; }
+
+        public PickerItem(string id, string name, bool isGuild)
+        {
+            Id = id;
+            Name = name;
+            IsGuild = isGuild;
+        }
+    }
+
     public sealed class WidgetViewModel : INotifyPropertyChanged, IDisposable
     {
         private readonly CoreDispatcher _dispatcher;
@@ -79,6 +94,32 @@ namespace DiscordWidget
 
         public ObservableCollection<ParticipantViewModel> Participants { get; } =
             new ObservableCollection<ParticipantViewModel>();
+
+        /// <summary>Servers, or the voice channels of one, depending on picker depth.</summary>
+        public ObservableCollection<PickerItem> PickerItems { get; } =
+            new ObservableCollection<PickerItem>();
+
+        private bool _isBrowsing;
+        private bool _isPickerBusy;
+        private string _pickerTitle = "Servers";
+
+        public bool IsBrowsing
+        {
+            get => _isBrowsing;
+            private set => Set(ref _isBrowsing, value);
+        }
+
+        public bool IsPickerBusy
+        {
+            get => _isPickerBusy;
+            private set => Set(ref _isPickerBusy, value);
+        }
+
+        public string PickerTitle
+        {
+            get => _pickerTitle;
+            private set => Set(ref _pickerTitle, value);
+        }
 
         public string ChannelName
         {
@@ -191,6 +232,88 @@ namespace DiscordWidget
             catch (Exception ex)
             {
                 await RunOnUiAsync(() => Status = ex.Message);
+            }
+        }
+
+        /// <summary>Opens the picker at the server list.</summary>
+        public async Task BrowseServersAsync()
+        {
+            if (!CanNavigate) return;
+
+            IsBrowsing = true;
+            PickerTitle = "Servers";
+            await LoadPickerAsync(async ct =>
+            {
+                var guilds = await _session.GetGuildsAsync(ct);
+                return guilds.Select(g => new PickerItem(g.Id, g.Name, isGuild: true)).ToList();
+            });
+        }
+
+        /// <summary>
+        /// Drills into a server, or joins a channel and closes the picker.
+        /// </summary>
+        public async Task SelectPickerItemAsync(PickerItem item)
+        {
+            if (item == null) return;
+
+            if (item.IsGuild)
+            {
+                PickerTitle = item.Name;
+                // Channels are fetched per server rather than up front: some accounts are in
+                // dozens of servers, and preloading would be one round trip each.
+                await LoadPickerAsync(async ct =>
+                {
+                    var channels = await _session.GetVoiceChannelsAsync(item.Id, ct);
+                    return channels.Select(c => new PickerItem(c.Id, c.Name, isGuild: false)).ToList();
+                });
+                return;
+            }
+
+            try
+            {
+                await _session.JoinVoiceChannelAsync(item.Id, _lifetime.Token);
+                // The resulting VOICE_STATE/CHANNEL_SELECT events refresh the participant
+                // list, so the picker just needs to get out of the way.
+                await RunOnUiAsync(() => IsBrowsing = false);
+            }
+            catch (Exception ex)
+            {
+                await RunOnUiAsync(() => Status = ex.Message);
+            }
+        }
+
+        public void CancelBrowsing()
+        {
+            IsBrowsing = false;
+            PickerItems.Clear();
+        }
+
+        private async Task LoadPickerAsync(Func<CancellationToken, Task<System.Collections.Generic.List<PickerItem>>> load)
+        {
+            await RunOnUiAsync(() =>
+            {
+                PickerItems.Clear();
+                IsPickerBusy = true;
+            });
+
+            try
+            {
+                var items = await load(_lifetime.Token);
+                await RunOnUiAsync(() =>
+                {
+                    foreach (var item in items) PickerItems.Add(item);
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                await RunOnUiAsync(() => Status = ex.Message);
+            }
+            finally
+            {
+                await RunOnUiAsync(() => IsPickerBusy = false);
             }
         }
 

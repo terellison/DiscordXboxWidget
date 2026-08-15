@@ -67,6 +67,32 @@ namespace Discord.Rpc
         }
     }
 
+    public sealed class GuildSummary
+    {
+        public string Id { get; }
+        public string Name { get; }
+
+        public GuildSummary(string id, string name)
+        {
+            Id = id;
+            Name = name;
+        }
+    }
+
+    public sealed class VoiceChannelSummary
+    {
+        public string Id { get; }
+        public string Name { get; }
+        public string GuildId { get; }
+
+        public VoiceChannelSummary(string id, string name, string guildId)
+        {
+            Id = id;
+            Name = name;
+            GuildId = guildId;
+        }
+    }
+
     public sealed class LocalVoiceSettings
     {
         public bool IsMuted { get; }

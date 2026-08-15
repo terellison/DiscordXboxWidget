@@ -225,6 +225,59 @@ namespace Discord.Rpc
         public Task SetDeafenedAsync(bool deafened, CancellationToken cancellationToken) =>
             SendCommandAsync("SET_VOICE_SETTINGS", new Dictionary<string, object?> { ["deaf"] = deafened }, cancellationToken);
 
+        public async Task<IReadOnlyList<GuildSummary>> GetGuildsAsync(CancellationToken cancellationToken)
+        {
+            var result = await SendCommandAsync("GET_GUILDS", null, cancellationToken).ConfigureAwait(false);
+
+            var guilds = new List<GuildSummary>();
+            if (result.ValueKind == JsonValueKind.Object
+                && result.TryGetProperty("guilds", out var array)
+                && array.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var guild in array.EnumerateArray())
+                {
+                    var id = GetString(guild, "id");
+                    if (id != null) guilds.Add(new GuildSummary(id, GetString(guild, "name") ?? "Server"));
+                }
+            }
+
+            return guilds;
+        }
+
+        public async Task<IReadOnlyList<VoiceChannelSummary>> GetVoiceChannelsAsync(
+            string guildId, CancellationToken cancellationToken)
+        {
+            var result = await SendCommandAsync("GET_CHANNELS", new Dictionary<string, object?>
+            {
+                ["guild_id"] = guildId,
+            }, cancellationToken).ConfigureAwait(false);
+
+            var channels = new List<VoiceChannelSummary>();
+            if (result.ValueKind == JsonValueKind.Object
+                && result.TryGetProperty("channels", out var array)
+                && array.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var channel in array.EnumerateArray())
+                {
+                    var id = GetString(channel, "id");
+                    if (id == null) continue;
+
+                    // Type 2 is GUILD_VOICE. The widget can only join voice, so text and
+                    // category entries are dropped here rather than in the UI.
+                    if (!channel.TryGetProperty("type", out var type)
+                        || type.ValueKind != JsonValueKind.Number
+                        || type.GetInt32() != 2)
+                    {
+                        continue;
+                    }
+
+                    channels.Add(new VoiceChannelSummary(id, GetString(channel, "name") ?? "Voice", guildId));
+                }
+            }
+
+            return channels;
+        }
+
         public Task JoinVoiceChannelAsync(string channelId, CancellationToken cancellationToken) =>
             SendCommandAsync("SELECT_VOICE_CHANNEL", new Dictionary<string, object?>
             {

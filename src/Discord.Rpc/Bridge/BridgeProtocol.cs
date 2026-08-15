@@ -38,10 +38,13 @@ namespace Discord.Rpc.Bridge
         public const string CmdSetDeafened = "setDeafened";
         public const string CmdJoinChannel = "joinChannel";
         public const string CmdLeaveChannel = "leaveChannel";
+        public const string CmdGetGuilds = "getGuilds";
+        public const string CmdGetVoiceChannels = "getVoiceChannels";
 
         // Command arguments.
         public const string ArgValue = "value";
         public const string ArgChannelId = "channelId";
+        public const string ArgGuildId = "guildId";
 
         // Bridge -> widget, unsolicited.
         public const string EvtState = "state";
