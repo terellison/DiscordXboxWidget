@@ -102,8 +102,7 @@ jobs:
             Where-Object { $_.Name -like '*_Test' } | Select-Object -First 1
           if (-not $test) { throw "No _Test output folder. Check the packaging step output." }
 
-          $msix = Get-ChildItem $test.FullName -Filter *.msix
-          if (-not $msix) { throw "No .msix produced. Check the packaging step output." }
+          $msix = @(Get-ChildItem $test.FullName -Filter *.msix)
           if ($msix.Count -ne 1) { throw "Expected one .msix, found $($msix.Count)." }
 
           # Framework dependencies are included deliberately: a machine without
