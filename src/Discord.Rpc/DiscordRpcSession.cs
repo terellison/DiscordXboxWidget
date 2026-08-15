@@ -44,6 +44,8 @@ namespace Discord.Rpc
         private Task? _readLoop;
         private string? _currentChannelId;
         private int _disposed;
+        private int _refreshPending;
+        private int _refreshDirty;
 
         public SessionState State { get; private set; } = SessionState.Disconnected;
 
@@ -60,6 +62,13 @@ namespace Discord.Rpc
         /// Null unless the identify scope was granted.
         /// </summary>
         public string? CurrentUserId { get; private set; }
+
+        /// <summary>
+        /// Every dispatch payload as received, before parsing. Diagnostics only: the field
+        /// shapes here were derived from documentation, and this is how they get checked
+        /// against what Discord actually sends.
+        /// </summary>
+        public event EventHandler<string>? FrameReceived;
 
         public event EventHandler<SpeakingEventArgs>? SpeakingChanged;
         public event EventHandler<VoiceChannelSnapshot?>? VoiceChannelChanged;
@@ -234,24 +243,40 @@ namespace Discord.Rpc
         private async Task RefreshVoiceChannelAsync(CancellationToken cancellationToken)
         {
             var channel = await GetCurrentVoiceChannelAsync(cancellationToken).ConfigureAwait(false);
-            await ResubscribeSpeakingAsync(channel?.Id, cancellationToken).ConfigureAwait(false);
+            await ResubscribeChannelEventsAsync(channel?.Id, cancellationToken).ConfigureAwait(false);
             VoiceChannelChanged?.Invoke(this, channel);
         }
 
         /// <summary>
-        /// Speaking events are per-channel subscriptions, so they have to be re-pointed
-        /// every time the user moves. Leaving the old subscription in place would leak
-        /// events from a channel the user is no longer in.
+        /// Events scoped to a single voice channel.
         /// </summary>
-        private async Task ResubscribeSpeakingAsync(string? channelId, CancellationToken cancellationToken)
+        /// <remarks>
+        /// The VOICE_STATE_* events are what keep the participant list live. Without them
+        /// the snapshot only refreshes when the local user changes channel, so another
+        /// person muting, joining or leaving is never noticed.
+        /// </remarks>
+        private static readonly string[] ChannelScopedEvents =
+        {
+            "SPEAKING_START",
+            "SPEAKING_STOP",
+            "VOICE_STATE_CREATE",
+            "VOICE_STATE_UPDATE",
+            "VOICE_STATE_DELETE",
+        };
+
+        /// <summary>
+        /// Per-channel subscriptions have to be re-pointed every time the user moves.
+        /// Leaving the old ones in place would leak events from a channel they have left.
+        /// </summary>
+        private async Task ResubscribeChannelEventsAsync(string? channelId, CancellationToken cancellationToken)
         {
             if (_currentChannelId == channelId) return;
 
             if (_currentChannelId != null && _subscribedChannels.Remove(_currentChannelId))
             {
                 var args = new Dictionary<string, object?> { ["channel_id"] = _currentChannelId };
-                await TryUnsubscribeAsync("SPEAKING_START", args, cancellationToken).ConfigureAwait(false);
-                await TryUnsubscribeAsync("SPEAKING_STOP", args, cancellationToken).ConfigureAwait(false);
+                foreach (var evt in ChannelScopedEvents)
+                    await TryUnsubscribeAsync(evt, args, cancellationToken).ConfigureAwait(false);
             }
 
             _currentChannelId = channelId;
@@ -259,8 +284,8 @@ namespace Discord.Rpc
             if (channelId != null && _subscribedChannels.Add(channelId))
             {
                 var args = new Dictionary<string, object?> { ["channel_id"] = channelId };
-                await SubscribeAsync("SPEAKING_START", args, cancellationToken).ConfigureAwait(false);
-                await SubscribeAsync("SPEAKING_STOP", args, cancellationToken).ConfigureAwait(false);
+                foreach (var evt in ChannelScopedEvents)
+                    await SubscribeAsync(evt, args, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -352,6 +377,8 @@ namespace Discord.Rpc
 
         private void DispatchFrame(string payload)
         {
+            FrameReceived?.Invoke(this, payload);
+
             using var doc = JsonDocument.Parse(payload);
             var root = doc.RootElement.Clone();
 
@@ -401,21 +428,53 @@ namespace Discord.Rpc
                     break;
 
                 case "VOICE_CHANNEL_SELECT":
-                    // Fire-and-forget: the read loop must not block on a round trip,
-                    // since the response to that round trip arrives on this same loop.
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            await RefreshVoiceChannelAsync(_shutdown.Token).ConfigureAwait(false);
-                        }
-                        catch (Exception ex) when (!(ex is OperationCanceledException))
-                        {
-                            SetState(SessionState.Faulted, ex.Message);
-                        }
-                    });
+                case "VOICE_STATE_CREATE":
+                case "VOICE_STATE_UPDATE":
+                case "VOICE_STATE_DELETE":
+                    QueueChannelRefresh();
                     break;
             }
+        }
+
+        /// <summary>
+        /// Schedules a channel refresh, coalescing bursts into a single trailing fetch.
+        /// </summary>
+        /// <remarks>
+        /// Runs off the read loop because the response to the refresh arrives on that very
+        /// loop, so awaiting inline would deadlock. Coalesced because VOICE_STATE_UPDATE
+        /// fires per participant per change: a room of eight unmuting together would
+        /// otherwise trigger eight full channel fetches.
+        /// </remarks>
+        private void QueueChannelRefresh()
+        {
+            // Another refresh is already running; it will pick up the newer state on its
+            // trailing pass rather than starting a second concurrent fetch.
+            if (Interlocked.CompareExchange(ref _refreshPending, 1, 0) != 0)
+            {
+                Volatile.Write(ref _refreshDirty, 1);
+                return;
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    do
+                    {
+                        Volatile.Write(ref _refreshDirty, 0);
+                        await RefreshVoiceChannelAsync(_shutdown.Token).ConfigureAwait(false);
+                    }
+                    while (Volatile.Read(ref _refreshDirty) == 1);
+                }
+                catch (Exception ex) when (!(ex is OperationCanceledException))
+                {
+                    SetState(SessionState.Faulted, ex.Message);
+                }
+                finally
+                {
+                    Volatile.Write(ref _refreshPending, 0);
+                }
+            });
         }
 
         private static VoiceChannelSnapshot? ParseChannel(JsonElement data)

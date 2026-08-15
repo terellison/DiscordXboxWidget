@@ -39,6 +39,14 @@ try
             await ToggleAsync(RequireClientId(args), cts.Token);
             break;
 
+        case "rawchannel":
+            await RawChannelAsync(RequireClientId(args), cts.Token);
+            break;
+
+        case "mutediag":
+            await MuteDiagAsync(RequireClientId(args), cts.Token);
+            break;
+
         default:
             Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | wsprobe | handshake | watch | toggle");
             return 2;
@@ -174,6 +182,94 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
     await session.ConnectAsync(ct);
     Console.WriteLine("Watching. Ctrl+C to stop.");
     await Task.Delay(Timeout.Infinite, ct);
+}
+
+// Prints every dispatch frame around a self-mute, in one process so there is no timing
+// race, to establish whether Discord actually emits VOICE_STATE_UPDATE for this change.
+static async Task MuteDiagAsync(string clientId, CancellationToken ct)
+{
+    using var session = new DiscordRpcSession(clientId, new ConsoleTokenProvider(clientId));
+
+    // Prints the parsed mute flag on every refresh, which is what the widget renders.
+    session.VoiceChannelChanged += (_, channel) =>
+    {
+        if (channel == null) { Console.WriteLine("[parsed] not in voice"); return; }
+        foreach (var p in channel.Participants)
+        {
+            if (p.Id != session.CurrentUserId) continue;
+            Console.WriteLine($"[parsed] {p.DisplayName} muted={p.IsMuted} deafened={p.IsDeafened}");
+        }
+    };
+
+    await session.ConnectAsync(ct);
+    Console.WriteLine("--- connected; toggling mute ---");
+
+    var original = await session.GetVoiceSettingsAsync(ct);
+    try
+    {
+        await session.SetMutedAsync(!original.IsMuted, ct);
+        await Task.Delay(2500, ct);
+        Console.WriteLine("--- restoring ---");
+    }
+    finally
+    {
+        await session.SetMutedAsync(original.IsMuted, CancellationToken.None);
+    }
+
+    await Task.Delay(2500, CancellationToken.None);
+    Console.WriteLine("--- done ---");
+}
+
+// Dumps the unparsed GET_SELECTED_VOICE_CHANNEL payload with the local user muted and
+// unmuted, so the participant voice-state field names can be read off real data rather
+// than inferred from docs.
+static async Task RawChannelAsync(string clientId, CancellationToken ct)
+{
+    using var session = new DiscordRpcSession(clientId, new ConsoleTokenProvider(clientId));
+    await session.ConnectAsync(ct);
+
+    var original = await session.GetVoiceSettingsAsync(ct);
+
+    try
+    {
+        foreach (var muted in new[] { false, true })
+        {
+            await session.SetMutedAsync(muted, ct);
+            // Discord applies the change asynchronously to the voice state it reports.
+            await Task.Delay(600, ct);
+
+            Console.WriteLine($"===== local user muted={muted} =====");
+            var raw = await CaptureChannelJsonAsync(session, ct);
+            Console.WriteLine(raw ?? "<not in a voice channel>");
+            Console.WriteLine();
+        }
+    }
+    finally
+    {
+        await session.SetMutedAsync(original.IsMuted, CancellationToken.None);
+    }
+}
+
+// GetCurrentVoiceChannelAsync returns a parsed snapshot, which is exactly the layer under
+// suspicion, so the raw dispatch is captured instead.
+static async Task<string?> CaptureChannelJsonAsync(DiscordRpcSession session, CancellationToken ct)
+{
+    string? captured = null;
+    void OnFrame(object? _, string payload)
+    {
+        if (payload.Contains("GET_SELECTED_VOICE_CHANNEL")) captured = payload;
+    }
+
+    session.FrameReceived += OnFrame;
+    try
+    {
+        await session.GetCurrentVoiceChannelAsync(ct);
+        return captured;
+    }
+    finally
+    {
+        session.FrameReceived -= OnFrame;
+    }
 }
 
 // The only mode that writes to Discord. Every other mode is read-only, so this is the
