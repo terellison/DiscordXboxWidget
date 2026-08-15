@@ -39,15 +39,23 @@ namespace Discord.Rpc
         public bool IsMuted { get; }
         public bool IsDeafened { get; }
 
+        /// <summary>
+        /// Fully resolved CDN URL, never null: users without an avatar resolve to their
+        /// default one. Built here rather than in the UI so the widget and the bridge
+        /// cannot disagree about it.
+        /// </summary>
+        public string AvatarUrl { get; }
+
         public string DisplayName => string.IsNullOrEmpty(Nickname) ? Username : Nickname!;
 
-        public VoiceUser(string id, string username, string? nickname, bool isMuted, bool isDeafened)
+        public VoiceUser(string id, string username, string? nickname, bool isMuted, bool isDeafened, string avatarUrl)
         {
             Id = id;
             Username = username;
             Nickname = nickname;
             IsMuted = isMuted;
             IsDeafened = isDeafened;
+            AvatarUrl = avatarUrl;
         }
     }
 

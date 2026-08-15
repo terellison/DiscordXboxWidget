@@ -35,7 +35,7 @@
                   Margin="0,8,0,0">
             <ListView.ItemContainerStyle>
                 <Style TargetType="ListViewItem">
-                    <Setter Property="MinHeight" Value="32" />
+                    <Setter Property="MinHeight" Value="38" />
                     <Setter Property="Padding" Value="4,2" />
                 </Style>
             </ListView.ItemContainerStyle>
@@ -48,12 +48,25 @@
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
 
-                        <!-- Ring is always laid out; only its opacity changes, so the row
-                             does not reflow every time someone starts talking. -->
-                        <Ellipse Grid.Column="0"
-                                 Width="10" Height="10"
-                                 Fill="{StaticResource SpeakingBrush}"
-                                 Opacity="{x:Bind SpeakingOpacity, Mode=OneWay}" />
+                        <!-- Avatar with the speaking ring drawn around it, both in one
+                             fixed-size cell so the row never reflows as people talk. -->
+                        <Grid Grid.Column="0" Width="28" Height="28">
+                            <Ellipse Width="28" Height="28"
+                                     Stroke="{StaticResource SpeakingBrush}"
+                                     StrokeThickness="2"
+                                     Opacity="{x:Bind SpeakingOpacity, Mode=OneWay}" />
+                            <Ellipse Width="22" Height="22">
+                                <Ellipse.Fill>
+                                    <ImageBrush Stretch="UniformToFill">
+                                        <ImageBrush.ImageSource>
+                                            <BitmapImage UriSource="{x:Bind AvatarUri}"
+                                                         DecodePixelWidth="44"
+                                                         DecodePixelHeight="44" />
+                                        </ImageBrush.ImageSource>
+                                    </ImageBrush>
+                                </Ellipse.Fill>
+                            </Ellipse>
+                        </Grid>
 
                         <TextBlock Grid.Column="1"
                                    Text="{x:Bind DisplayName}"

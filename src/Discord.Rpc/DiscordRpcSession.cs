@@ -554,7 +554,9 @@ namespace Discord.Rpc
                         username: GetString(user, "username") ?? "unknown",
                         nickname: GetString(state, "nick"),
                         isMuted: GetBool(voice, "mute") || GetBool(voice, "self_mute"),
-                        isDeafened: GetBool(voice, "deaf") || GetBool(voice, "self_deaf")));
+                        isDeafened: GetBool(voice, "deaf") || GetBool(voice, "self_deaf"),
+                        avatarUrl: DiscordCdn.AvatarUrl(
+                            userId, GetString(user, "avatar"), GetString(user, "discriminator"))));
                 }
             }
 

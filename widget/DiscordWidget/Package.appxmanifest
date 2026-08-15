@@ -95,9 +95,8 @@
   </Applications>
 
   <Capabilities>
-    <!-- The widget itself no longer talks to Discord or to discord.com; the bridge does
-         both. Kept only so the widget can be pointed back at a direct transport for
-         debugging without editing the manifest. -->
+    <!-- Required: participant avatars are fetched directly from cdn.discordapp.com. All
+         Discord RPC traffic goes through the bridge, but image loading does not. -->
     <Capability Name="internetClient" />
     <!-- Required by FullTrustProcessLauncher. Restricted: fine for sideloading, and would
          need Store onboarding review, which this design does not target anyway. -->

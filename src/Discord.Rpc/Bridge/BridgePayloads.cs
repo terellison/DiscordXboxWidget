@@ -34,6 +34,7 @@ namespace Discord.Rpc.Bridge
                     if (p.Nickname != null) w.WriteString("nickname", p.Nickname);
                     w.WriteBoolean("muted", p.IsMuted);
                     w.WriteBoolean("deafened", p.IsDeafened);
+                    w.WriteString("avatarUrl", p.AvatarUrl);
                     w.WriteEndObject();
                 }
                 w.WriteEndArray();
@@ -56,12 +57,16 @@ namespace Discord.Rpc.Bridge
             {
                 foreach (var p in arr.EnumerateArray())
                 {
+                    var id = Str(p, "id") ?? string.Empty;
                     participants.Add(new VoiceUser(
-                        id: Str(p, "id") ?? string.Empty,
+                        id: id,
                         username: Str(p, "username") ?? "unknown",
                         nickname: Str(p, "nickname"),
                         isMuted: Bool(p, "muted"),
-                        isDeafened: Bool(p, "deafened")));
+                        isDeafened: Bool(p, "deafened"),
+                        // Falls back rather than trusting the sender: an older bridge would
+                        // omit the field entirely and leave the widget with a null source.
+                        avatarUrl: Str(p, "avatarUrl") ?? DiscordCdn.AvatarUrl(id, null, null)));
                 }
             }
 

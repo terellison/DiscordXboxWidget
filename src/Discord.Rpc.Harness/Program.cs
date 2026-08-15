@@ -180,6 +180,7 @@ static async Task WatchAsync(string clientId, CancellationToken ct)
             var nick = p.Nickname == null ? "" : $" (nick: {p.Nickname})";
 
             Console.WriteLine($"           - {p.DisplayName}{nick}  id={p.Id}{suffix}");
+            Console.WriteLine($"             avatar: {p.AvatarUrl}");
         }
     };
 

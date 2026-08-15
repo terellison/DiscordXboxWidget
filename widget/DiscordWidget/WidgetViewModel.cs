@@ -21,6 +21,7 @@ namespace DiscordWidget
         public bool IsMuted { get; }
         public bool IsDeafened { get; }
         public bool IsSelf { get; }
+        public Uri AvatarUri { get; }
 
         public bool IsSpeaking
         {
@@ -56,6 +57,10 @@ namespace DiscordWidget
             IsMuted = user.IsMuted;
             IsDeafened = user.IsDeafened;
             IsSelf = isSelf;
+
+            // A malformed URL must not take down the whole participant list, so this
+            // degrades to no image rather than throwing inside the binding.
+            AvatarUri = Uri.TryCreate(user.AvatarUrl, UriKind.Absolute, out var uri) ? uri : null;
         }
 
         public event PropertyChangedEventHandler PropertyChanged;
