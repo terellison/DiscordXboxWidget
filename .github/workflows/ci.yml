@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # The library, bridge, harness and tests. Split from the widget because this half needs
+  # nothing but the .NET SDK, so a UWP toolchain problem cannot mask a real test failure.
+  test:
+    name: Build and test
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # The widget cannot be evaluated by the dotnet CLI at all (no WindowsXaml targets),
+      # so the projects are named explicitly rather than restoring the solution.
+      - name: Restore
+        run: |
+          dotnet restore src/Discord.Rpc/Discord.Rpc.csproj
+          dotnet restore src/Discord.Rpc.Bridge/Discord.Rpc.Bridge.csproj
+          dotnet restore src/Discord.Rpc.Harness/Discord.Rpc.Harness.csproj
+          dotnet restore tests/Discord.Rpc.Tests/Discord.Rpc.Tests.csproj
+
+      - name: Build
+        run: |
+          dotnet build src/Discord.Rpc.Bridge/Discord.Rpc.Bridge.csproj -c Release --no-restore
+          dotnet build src/Discord.Rpc.Harness/Discord.Rpc.Harness.csproj -c Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test tests/Discord.Rpc.Tests/Discord.Rpc.Tests.csproj
+          -c Release --no-restore
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory ${{ github.workspace }}/test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results/
+
+  # The UWP widget needs full MSBuild and the Universal Windows Platform workload. The
+  # workload is not guaranteed to be present on the hosted image, so this job installs it
+  # if missing rather than failing with a confusing "project could not be loaded".
+  widget:
+    name: Build widget
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Ensure UWP workload
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $installed = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Workload.Universal -property installationPath
+          if ($installed) {
+            Write-Host "UWP workload already present at $installed"
+            exit 0
+          }
+
+          Write-Host "UWP workload missing; installing."
+          $path = & $vswhere -latest -products * -property installationPath
+          $installer = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
+          $p = Start-Process -FilePath $installer -Wait -PassThru -ArgumentList @(
+            'modify', '--installPath', "`"$path`"",
+            '--add', 'Microsoft.VisualStudio.Workload.Universal',
+            '--includeRecommended', '--quiet', '--norestart'
+          )
+          if ($p.ExitCode -ne 0) { throw "vs_installer exited $($p.ExitCode)" }
+
+      # The bridge must exist before the widget builds: the widget packages its output by
+      # path, and would otherwise produce a package with no full-trust component and no error.
+      - name: Build bridge
+        run: dotnet build src/Discord.Rpc.Bridge/Discord.Rpc.Bridge.csproj -c Release
+
+      - name: Restore widget
+        run: msbuild widget/DiscordWidget/DiscordWidget.csproj -t:Restore -p:Configuration=Release -p:Platform=x64
+
+      - name: Build widget
+        run: msbuild widget/DiscordWidget/DiscordWidget.csproj -p:Configuration=Release -p:Platform=x64
+
+      - name: Verify the bridge was packaged
+        shell: pwsh
+        run: |
+          $recipe = "widget/DiscordWidget/bin/x64/Release/DiscordWidget.build.appxrecipe"
+          if (-not (Test-Path $recipe)) { throw "No appxrecipe produced at $recipe" }
+
+          [xml]$x = Get-Content $recipe
+          $bridge = $x.Project.ItemGroup.AppxPackagedFile |
+            Where-Object { $_.PackagePath -like 'bridge\*' }
+
+          if (-not $bridge) {
+            throw "Widget packaged without the bridge. This builds and deploys cleanly but cannot reach Discord."
+          }
+          Write-Host "Bridge packaged: $($bridge.Count) file(s)"

@@ -364,6 +364,11 @@ namespace Discord.Rpc
             CancellationToken cancellationToken,
             string? evt = null)
         {
+            // Without this a call made after disposal registers a pending completion that
+            // nothing will ever complete, and the caller waits forever rather than failing.
+            if (Volatile.Read(ref _disposed) != 0)
+                throw new ObjectDisposedException(nameof(DiscordRpcSession));
+
             var nonce = Guid.NewGuid().ToString();
             var tcs = new TaskCompletionSource<JsonElement>(TaskCreationOptions.RunContinuationsAsynchronously);
             _pending[nonce] = tcs;
