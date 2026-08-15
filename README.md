@@ -133,7 +133,12 @@ src/Discord.Rpc.Bridge/bin/Debug/net9.0-windows10.0.19041.0/win-x64/Discord.Rpc.
 Two, because the widget's AppContainer cannot write outside its own storage:
 
 - Bridge: `%LOCALAPPDATA%\DiscordXboxWidget\bridge.log`
-- Widget: `%LOCALAPPDATA%\Packages\DiscordXboxWidget_kv7a30n3sm5st\LocalState\widget.log`
+- Widget: under the package's own local state. The family-name suffix is derived from
+  `Publisher`, so it changes whenever that does — find it rather than hardcoding it:
+
+```bash
+Get-ChildItem "$env:LOCALAPPDATA\Packages\DiscordXboxWidget_*\LocalState\widget.log"
+```
 
 Both matter because a Game Bar widget has no console and WinRT exceptions surface with no
 usable stack — "The parameter is incorrect" with no source is otherwise all you get.
