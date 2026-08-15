@@ -142,20 +142,12 @@ namespace DiscordWidget
                 _session.SpeakingChanged += OnSpeakingChanged;
                 _session.VoiceChannelChanged += OnVoiceChannelChanged;
 
+                // Deliberately reads nothing off the session afterwards. ConnectAsync
+                // returning does not mean the session is usable: over the bridge it means
+                // only that the bridge process attached, and Discord authentication happens
+                // after that. Capabilities and voice settings are picked up from
+                // StateChanged instead, which is true for both implementations.
                 await _session.ConnectAsync(_lifetime.Token);
-
-                await RunOnUiAsync(() =>
-                {
-                    CanControlVoice = _session.Capabilities.HasFlag(SessionCapabilities.SetVoiceState);
-                    CanNavigate = _session.Capabilities.HasFlag(SessionCapabilities.ChannelNavigation);
-                });
-
-                var settings = await _session.GetVoiceSettingsAsync(_lifetime.Token);
-                await RunOnUiAsync(() =>
-                {
-                    IsMuted = settings.IsMuted;
-                    IsDeafened = settings.IsDeafened;
-                });
             }
             catch (DiscordRpcException ex) when (ex.IsScopeDenial)
             {
@@ -220,10 +212,16 @@ namespace DiscordWidget
         {
             _ = RunOnUiAsync(() =>
             {
+                // Recomputed on every state change: capabilities are only known once the
+                // session authenticates, which happens after ConnectAsync has returned.
+                CanControlVoice = _session.Capabilities.HasFlag(SessionCapabilities.SetVoiceState);
+                CanNavigate = _session.Capabilities.HasFlag(SessionCapabilities.ChannelNavigation);
+
                 switch (e.State)
                 {
                     case SessionState.Connected:
                         Status = string.Empty;
+                        _ = RefreshVoiceSettingsAsync();
                         break;
                     case SessionState.Unauthorized:
                         Status = Detail("Not authorized for RPC on this account.", e.Detail);
@@ -270,6 +268,30 @@ namespace DiscordWidget
 
                 SetVoicePresence(true);
             });
+        }
+
+        /// <summary>
+        /// Pulls the real mute/deafen state once the session is authenticated, so the
+        /// button labels start out matching Discord rather than defaulting to unmuted.
+        /// </summary>
+        private async Task RefreshVoiceSettingsAsync()
+        {
+            try
+            {
+                var settings = await _session.GetVoiceSettingsAsync(_lifetime.Token);
+                await RunOnUiAsync(() =>
+                {
+                    IsMuted = settings.IsMuted;
+                    IsDeafened = settings.IsDeafened;
+                });
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception ex)
+            {
+                await RunOnUiAsync(() => Status = ex.Message);
+            }
         }
 
         private static string Detail(string summary, string detail) =>

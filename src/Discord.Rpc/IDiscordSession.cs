@@ -25,6 +25,17 @@ namespace Discord.Rpc
         /// </summary>
         string? CurrentUserId { get; }
 
+        /// <summary>
+        /// Begins connecting.
+        /// </summary>
+        /// <remarks>
+        /// Completing does NOT mean the session is usable, and callers must not read
+        /// <see cref="Capabilities"/>, <see cref="CurrentUserId"/> or issue commands purely
+        /// because it returned. The bridge implementation completes as soon as the
+        /// out-of-process host attaches, with Discord authentication still to come.
+        /// Wait for <see cref="StateChanged"/> to report
+        /// <see cref="SessionState.Connected"/> instead; that holds for every implementation.
+        /// </remarks>
         Task ConnectAsync(CancellationToken cancellationToken);
 
         Task<VoiceChannelSnapshot?> GetCurrentVoiceChannelAsync(CancellationToken cancellationToken);
