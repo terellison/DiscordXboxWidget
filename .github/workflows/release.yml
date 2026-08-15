@@ -107,8 +107,14 @@ jobs:
           $out = Join-Path $env:GITHUB_WORKSPACE 'artifacts'
           New-Item -ItemType Directory -Force -Path $out | Out-Null
 
+          # Framework dependencies are included deliberately: a machine without
+          # Microsoft.NET.Native.Framework fails Add-AppxPackage with 0x80073CF3, and there
+          # is no Store to resolve them from. Other architectures are dropped -- this
+          # package is x64 only, and shipping ARM64 binaries implies support that does not
+          # exist.
           $files = Get-ChildItem widget/DiscordWidget -Recurse -Include *.msix,*.appx,*.msixbundle,*.appxbundle `
-            -ErrorAction SilentlyContinue
+            -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -notmatch 'ARM64|x86' }
           if (-not $files) { throw "No package produced. Check the packaging step output." }
 
           $files | ForEach-Object { Copy-Item $_.FullName $out }
