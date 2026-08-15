@@ -337,7 +337,7 @@ namespace Discord.Rpc
                     }
                 }
 
-                SetState(SessionState.Disconnected, "Discord closed the IPC pipe.");
+                SetState(SessionState.Disconnected, "Discord closed the connection.");
             }
             catch (OperationCanceledException)
             {

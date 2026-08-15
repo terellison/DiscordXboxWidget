@@ -236,10 +236,12 @@ namespace DiscordWidget
                         Status = string.Empty;
                         break;
                     case SessionState.Unauthorized:
-                        Status = "Not authorized for RPC on this account.";
+                        Status = Detail("Not authorized for RPC on this account.", e.Detail);
                         break;
                     case SessionState.Disconnected:
-                        Status = "Discord disconnected.";
+                        // e.Detail carries Discord's close reason. Dropping it turns every
+                        // distinct failure into the same useless "disconnected" message.
+                        Status = Detail("Discord disconnected.", e.Detail);
                         SetVoicePresence(false);
                         break;
                     case SessionState.Faulted:
@@ -279,6 +281,9 @@ namespace DiscordWidget
                 SetVoicePresence(true);
             });
         }
+
+        private static string Detail(string summary, string detail) =>
+            string.IsNullOrWhiteSpace(detail) ? summary : $"{summary} {detail}";
 
         private void SetVoicePresence(bool inVoice)
         {

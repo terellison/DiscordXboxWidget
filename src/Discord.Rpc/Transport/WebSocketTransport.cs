@@ -139,7 +139,18 @@ namespace Discord.Rpc.Transport
                 }
 
                 if (result.MessageType == WebSocketMessageType.Close)
-                    return new RpcFrame(RpcOpcode.Close, socket.CloseStatusDescription ?? string.Empty);
+                {
+                    // Surface the numeric close code, not just the description: Discord
+                    // frequently closes with an empty description, and the code is what
+                    // distinguishes 4000 invalid client id from 4004 invalid origin.
+                    var code = socket.CloseStatus.HasValue ? (int)socket.CloseStatus.Value : 0;
+                    var reason = socket.CloseStatusDescription;
+                    var text = string.IsNullOrWhiteSpace(reason)
+                        ? $"WebSocket closed (code {code})."
+                        : $"WebSocket closed (code {code}): {reason}";
+
+                    return new RpcFrame(RpcOpcode.Close, text);
+                }
 
                 message.Write(buffer, 0, result.Count);
 
