@@ -41,7 +41,7 @@ back on. Inspect the certificate first if you would rather not take that on trus
 Download **every file** attached to the release into the same folder, then:
 
 ```bash
-Add-AppxPackage -Path .\DiscordWidget_0.1.1.0_x64.msix -DependencyPath .\Microsoft.NET.Native.Framework.2.2.appx,.\Microsoft.NET.Native.Runtime.2.2.appx,.\Microsoft.VCLibs.x64.14.00.appx
+Add-AppxPackage -Path .\DiscordWidget_0.1.2.0_x64.msix -DependencyPath .\Microsoft.NET.Native.Framework.2.2.appx,.\Microsoft.NET.Native.Runtime.2.2.appx,.\Microsoft.VCLibs.x64.14.00.appx
 ```
 
 The framework packages matter: Windows cannot fetch them from the Store for a sideloaded
@@ -74,8 +74,20 @@ Press **Win+G**, open the widget menu, and pick **Discord Voice**.
 
 ![The Game Bar widget menu with Discord Voice listed](docs/images/gamebar-widget-menu.png)
 
-The first launch writes a template to `%LOCALAPPDATA%\DiscordXboxWidget\config.json` and the
-widget will tell you it has no application configured. Open that file and set `clientId`:
+On first launch it will say no application is configured. Click the **gear** in the widget's
+title bar, paste your Application ID, and press **Save and connect**.
+
+Discord then shows a consent dialog asking you to authorize your application. Accept it once;
+the token is cached DPAPI-encrypted, so the prompt will not reappear.
+
+The refresh button beside the controls reconnects at any time — useful if you started the
+widget before Discord, or changed applications.
+
+<details>
+<summary>Editing the file directly instead</summary>
+
+The same setting lives in `%LOCALAPPDATA%\DiscordXboxWidget\config.json`, written as a
+template on first launch:
 
 ```json
 {
@@ -83,8 +95,9 @@ widget will tell you it has no application configured. Open that file and set `c
 }
 ```
 
-Reopen the widget. Discord shows a consent dialog asking you to authorize your application —
-accept it once, and the token is cached DPAPI-encrypted so the prompt will not reappear.
+Press refresh in the widget afterwards, or reopen it, so the bridge picks up the change.
+
+</details>
 
 ### If something goes wrong
 
@@ -100,7 +113,7 @@ Get-ChildItem "$env:LOCALAPPDATA\Packages\DiscordXboxWidget_*\LocalState\widget.
 
 | Symptom | Cause |
 |---|---|
-| "No Discord application configured" | Step 4 — set `clientId` in `config.json` |
+| "No Discord application configured" | Step 4 — set the Application ID via the gear |
 | `invalid_client` during authorization | **Public Client** not enabled on your app's OAuth2 tab |
 | `invalid_scope` during authorization | The application belongs to a Team; `rpc` requires personal ownership |
 | 4006 / not authorized | The Discord account in use does not own the application from step 3 |

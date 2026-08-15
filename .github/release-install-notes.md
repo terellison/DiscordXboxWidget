@@ -14,7 +14,7 @@ Then install, passing the framework packages alongside it — Windows cannot fet
 the Store for a sideloaded app, and without them installation fails with `0x80073CF3`:
 
 ```powershell
-Add-AppxPackage -Path .\DiscordWidget_0.1.1.0_x64.msix -DependencyPath `
+Add-AppxPackage -Path .\DiscordWidget_0.1.2.0_x64.msix -DependencyPath `
   .\Microsoft.NET.Native.Framework.2.2.appx, `
   .\Microsoft.NET.Native.Runtime.2.2.appx, `
   .\Microsoft.VCLibs.x64.14.00.appx
