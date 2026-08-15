@@ -41,12 +41,16 @@ back on. Inspect the certificate first if you would rather not take that on trus
 Download **every file** attached to the release into the same folder, then:
 
 ```bash
-Add-AppxPackage -Path .\DiscordWidget_0.1.2.0_x64.msix -DependencyPath .\Microsoft.NET.Native.Framework.2.2.appx,.\Microsoft.NET.Native.Runtime.2.2.appx,.\Microsoft.VCLibs.x64.14.00.appx
+Add-AppxPackage -Path .\DiscordXboxWidget_0.1.3.0_x64.msix -DependencyPath .\Microsoft.NET.Native.Framework.2.2.appx,.\Microsoft.NET.Native.Runtime.2.2.appx,.\Microsoft.VCLibs.x64.14.00.appx
 ```
 
 The framework packages matter: Windows cannot fetch them from the Store for a sideloaded
 app, and without them the install fails with `0x80073CF3`. If your machine already has them,
 the extra arguments are harmless.
+
+The package is around 43 MB because it carries its own .NET runtime. That is deliberate:
+nothing about a sideloaded install can fetch a missing shared runtime, so the alternative
+was a prerequisite you would discover by the widget not working.
 
 ### 3. Register a Discord application
 
@@ -113,6 +117,7 @@ Get-ChildItem "$env:LOCALAPPDATA\Packages\DiscordXboxWidget_*\LocalState\widget.
 
 | Symptom | Cause |
 |---|---|
+| `0x80073CFB` on install | A build deployed from Visual Studio is registered. `Remove-AppxPackage` it first — an unpackaged registration cannot be replaced by a packaged one |
 | "No Discord application configured" | Step 4 — set the Application ID via the gear |
 | `invalid_client` during authorization | **Public Client** not enabled on your app's OAuth2 tab |
 | `invalid_scope` during authorization | The application belongs to a Team; `rpc` requires personal ownership |
