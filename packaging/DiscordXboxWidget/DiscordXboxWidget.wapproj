@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="15.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup Condition="'$(VisualStudioVersion)' == '' or '$(VisualStudioVersion)' &lt; '15.0'">
+    <VisualStudioVersion>15.0</VisualStudioVersion>
+  </PropertyGroup>
+
+  <!-- x64 only. The widget is x64 only, and offering other platforms here would produce
+       packages that cannot be built. -->
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+
+  <PropertyGroup>
+    <WapProjPath Condition="'$(WapProjPath)'==''">$(MSBuildExtensionsPath)\Microsoft\DesktopBridge\</WapProjPath>
+  </PropertyGroup>
+
+  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.props" />
+
+  <PropertyGroup>
+    <ProjectGuid>DD651608-B4C6-4A18-8679-A3E0B184C696</ProjectGuid>
+    <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.18362.0</TargetPlatformMinVersion>
+    <DefaultLanguage>en-US</DefaultLanguage>
+    <!-- Off by default so the project builds without a certificate, matching the widget
+         project. The release workflow supplies one on the command line. -->
+    <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
+    <AppxAutoIncrementPackageRevision>False</AppxAutoIncrementPackageRevision>
+    <AppxBundle>Never</AppxBundle>
+    <AppxBundlePlatforms>x64</AppxBundlePlatforms>
+    <UapAppxPackageBuildMode>SideloadOnly</UapAppxPackageBuildMode>
+    <!-- NU1702: referencing a UWP project from a wapproj is the supported arrangement,
+         but NuGet still reports the framework pairing as unexpected. -->
+    <NoWarn>$(NoWarn);NU1702</NoWarn>
+  </PropertyGroup>
+
+  <!-- Names the referenced project whose Application element is the package entry point.
+       Must match the ProjectReference Include below character for character. -->
+  <PropertyGroup>
+    <EntryPointProjectUniqueName>..\..\widget\DiscordWidget\DiscordWidget.csproj</EntryPointProjectUniqueName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AppxManifest Include="Package.appxmanifest">
+      <SubType>Designer</SubType>
+    </AppxManifest>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\widget\DiscordWidget\DiscordWidget.csproj" />
+    <ProjectReference Include="..\..\src\Discord.Rpc.Bridge\Discord.Rpc.Bridge.csproj" />
+  </ItemGroup>
+
+  <Import Project="$(WapProjPath)\Microsoft.DesktopBridge.targets" />
+
+</Project>

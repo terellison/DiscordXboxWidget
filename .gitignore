@@ -9,7 +9,10 @@ AppPackages/
 BundleArtifacts/
 *.appx
 *.appxbundle
+*.msix
 *.msixbundle
+# The packaging project writes this next to the project file rather than into obj\
+*.assets.cache
 
 # Never commit the client secret or cached tokens
 *.secret

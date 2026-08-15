@@ -128,26 +128,9 @@
     </SDKReference>
   </ItemGroup>
 
-  <!-- Package the full-trust bridge under bridge\, matching the Executable path declared
-       on the windows.fullTrustProcess extension. Built via a project reference would pull
-       a net9.0 assembly into a UWP reference graph, so it is consumed as content instead
-       and ordered with a solution-level build dependency. -->
-  <PropertyGroup>
-    <BridgeOutputDir>$(MSBuildThisFileDirectory)..\..\src\Discord.Rpc.Bridge\bin\$(Configuration)\net9.0-windows10.0.19041.0\win-x64\</BridgeOutputDir>
-  </PropertyGroup>
-
-  <Target Name="IncludeBridgePayload" BeforeTargets="AssignTargetPaths">
-    <ItemGroup>
-      <BridgeFile Include="$(BridgeOutputDir)**\*.*"
-                  Exclude="$(BridgeOutputDir)**\*.pdb;$(BridgeOutputDir)**\*.xml" />
-      <Content Include="@(BridgeFile)">
-        <Link>bridge\%(RecursiveDir)%(Filename)%(Extension)</Link>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
-    </ItemGroup>
-    <Warning Condition="'@(BridgeFile)' == ''"
-             Text="Bridge output not found at $(BridgeOutputDir). Build Discord.Rpc.Bridge first or the widget will package without its full-trust component." />
-  </Target>
+  <!-- The full-trust bridge is not packaged here. packaging\DiscordXboxWidget owns it, as
+       a project reference: this project cannot reference it directly without pulling a
+       net9.0 assembly into a UWP reference graph. -->
 
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\WindowsXaml\v$(VisualStudioVersion)\Microsoft.Windows.UI.Xaml.CSharp.targets" />
 </Project>

@@ -2,10 +2,6 @@
 
 ## Known gaps
 
-**Windows Application Packaging Project.** `runFullTrust` builds emit `APPX0006` advising
-that packaging should go through one. Current releases package directly from the UWP project,
-which works but is not the supported route for sideload packages.
-
 **Placeholder tile art.** Everything in `widget/DiscordWidget/Assets/` and `GameBar/` is
 generated flat blurple with a white circle. Functional, not designed.
 
@@ -32,9 +28,23 @@ Discord keybind, so it has not been built.
 
 - Per-user volume control (`SET_USER_VOICE_SETTINGS` supports it)
 - Deafen state and server-mute shown distinctly, rather than folded into one icon
-- A settings widget (Game Bar supports `Type="Settings"`) for the application id, replacing
-  hand-editing `config.json`
 - Remember recent channels for faster switching than browsing the full server list
+- Ship the packaging project's generated `Install.ps1`, which trusts the certificate and
+  installs the dependencies in one step, instead of the manual sequence in the README
+
+## Settled: the package carries its own .NET runtime
+
+Moving to a packaging project made the bridge self-contained, taking the msix from roughly
+9 MB to 43 MB. Kept deliberately rather than worked around.
+
+A sideloaded package has no Store behind it, so a missing shared runtime cannot be resolved
+at install time and would have to become a documented prerequisite. It was already an
+undocumented one: releases up to and including v0.1.2 shipped a framework-dependent bridge
+and listed no .NET requirement, so on a machine without the .NET 9 Desktop Runtime the
+bridge could not start — indistinguishable, from the widget, from Discord not running.
+
+Size is a one-time download. The alternative was a prerequisite most people would discover
+by having the widget not work.
 
 ## Settled: users supply their own application id
 

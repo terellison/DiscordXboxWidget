@@ -49,9 +49,6 @@ jobs:
       - name: Test before packaging
         run: dotnet test tests/Discord.Rpc.Tests/Discord.Rpc.Tests.csproj -c Release
 
-      - name: Build bridge
-        run: dotnet build src/Discord.Rpc.Bridge/Discord.Rpc.Bridge.csproj -c Release
-
       # Decodes a base64 PFX from secrets when one is configured. Without it the package is
       # built unsigned, which is still useful as a build artifact but cannot be installed
       # by a normal user until it is signed.
@@ -71,8 +68,8 @@ jobs:
           "pfx=$pfx" >> $env:GITHUB_OUTPUT
           "signed=true" >> $env:GITHUB_OUTPUT
 
-      - name: Restore widget
-        run: msbuild widget/DiscordWidget/DiscordWidget.csproj -t:Restore -p:Configuration=Release -p:Platform=x64
+      - name: Restore packaging project
+        run: msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj -t:Restore -p:Configuration=Release -p:Platform=x64
 
       # Release uses the .NET Native toolchain, which is the only configuration where the
       # runtime directives in Default.rd.xml matter. Packaging here is what exercises it.
@@ -81,11 +78,8 @@ jobs:
         env:
           CERT_PASSWORD: ${{ secrets.SIGNING_CERTIFICATE_PASSWORD }}
         run: >
-          msbuild widget/DiscordWidget/DiscordWidget.csproj
+          msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj
           -p:Configuration=Release -p:Platform=x64
-          -p:AppxBundle=Never
-          -p:UapAppxPackageBuildMode=SideloadOnly
-          -p:GenerateAppxPackageOnBuild=true
           -p:AppxPackageSigningEnabled=true
           -p:PackageCertificateKeyFile=${{ steps.signing.outputs.pfx }}
           -p:PackageCertificatePassword=$env:CERT_PASSWORD
@@ -93,11 +87,8 @@ jobs:
       - name: Package (unsigned)
         if: steps.signing.outputs.signed != 'true'
         run: >
-          msbuild widget/DiscordWidget/DiscordWidget.csproj
+          msbuild packaging/DiscordXboxWidget/DiscordXboxWidget.wapproj
           -p:Configuration=Release -p:Platform=x64
-          -p:AppxBundle=Never
-          -p:UapAppxPackageBuildMode=SideloadOnly
-          -p:GenerateAppxPackageOnBuild=true
           -p:AppxPackageSigningEnabled=false
 
       - name: Collect package
@@ -107,17 +98,24 @@ jobs:
           $out = Join-Path $env:GITHUB_WORKSPACE 'artifacts'
           New-Item -ItemType Directory -Force -Path $out | Out-Null
 
+          $test = Get-ChildItem packaging/DiscordXboxWidget/AppPackages -Directory |
+            Where-Object { $_.Name -like '*_Test' } | Select-Object -First 1
+          if (-not $test) { throw "No _Test output folder. Check the packaging step output." }
+
+          $msix = @(Get-ChildItem $test.FullName -Filter *.msix)
+          if ($msix.Count -ne 1) { throw "Expected one .msix, found $($msix.Count)." }
+
           # Framework dependencies are included deliberately: a machine without
           # Microsoft.NET.Native.Framework fails Add-AppxPackage with 0x80073CF3, and there
-          # is no Store to resolve them from. Other architectures are dropped -- this
-          # package is x64 only, and shipping ARM64 binaries implies support that does not
-          # exist.
-          $files = Get-ChildItem widget/DiscordWidget -Recurse -Include *.msix,*.appx,*.msixbundle,*.appxbundle `
-            -ErrorAction SilentlyContinue |
-            Where-Object { $_.Name -notmatch 'ARM64|x86' }
-          if (-not $files) { throw "No package produced. Check the packaging step output." }
+          # is no Store to resolve them from. Selected by architecture directory rather
+          # than by filename -- the packaging project emits ARM, ARM64, x86 and x64
+          # alongside each other, and this package is x64 only. Shipping the others would
+          # imply support that does not exist.
+          $deps = Join-Path $test.FullName 'Dependencies\x64'
+          if (-not (Test-Path $deps)) { throw "No x64 dependency packages at $deps." }
 
-          $files | ForEach-Object { Copy-Item $_.FullName $out }
+          @($msix) + @(Get-ChildItem $deps -Filter *.appx) |
+            ForEach-Object { Copy-Item $_.FullName $out }
 
           # Publish the public half of the signing certificate alongside the package.
           # Installing a self-signed MSIX requires trusting the certificate first, so a

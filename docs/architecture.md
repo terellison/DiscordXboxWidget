@@ -10,12 +10,22 @@ Game Bar
                           └── Discord desktop client
 ```
 
+Both halves ship in one msix, built by the packaging project:
+
+```
+DiscordXboxWidget.msix
+  ├── DiscordWidget.exe            the AppContainer half (entry point)
+  ├── AppxManifest.xml             identity, Game Bar widgets, app service, capabilities
+  └── Discord.Rpc.Bridge\          the full-trust half, self-contained .NET
+```
+
 | Project | Target | Role |
 |---|---|---|
 | `Discord.Rpc` | netstandard2.0 | Protocol, transports, session, bridge payloads |
 | `Discord.Rpc.Bridge` | net9.0-windows | Full-trust host that actually talks to Discord |
 | `Discord.Rpc.Harness` | net9.0 | Console rig for probing Discord directly |
 | `DiscordWidget` | UWP | The Game Bar widget itself |
+| `DiscordXboxWidget` | wapproj | Packaging project: combines the two halves into the msix |
 
 ## Why there is a bridge at all
 
@@ -135,18 +145,83 @@ for two independent reasons that happen to agree:
 The bridge writes a template on first run and reports the reason through the AppService, so
 an unconfigured install explains itself in the widget rather than failing silently.
 
+## Packaging
+
+The msix is built by `packaging/DiscordXboxWidget`, a Windows Application Packaging Project
+that references the widget and the bridge. Before it existed the widget project produced the
+package itself and copied the bridge in through a glob, which worked but emitted `APPX0006`:
+a project declaring `runFullTrust` is expected to be packaged this way.
+
+Three consequences worth knowing, because none of them are obvious from the project file:
+
+**There are two manifests, and only one of them ships.** `packaging/DiscordXboxWidget/Package.appxmanifest`
+is the real one. `widget/DiscordWidget/Package.appxmanifest` exists only because a UWP
+project cannot build without one, and is deliberately minimal — a package feature added
+there is silently absent from the product. Its `Identity` is intentionally different so that
+deploying the widget project alone cannot replace a real install with a bridge-less copy.
+
+**The bridge's path inside the package is derived, not chosen.** A referenced .NET project is
+published into a folder named after the project, so the bridge lives at
+`Discord.Rpc.Bridge\Discord.Rpc.Bridge.exe` and the `windows.fullTrustProcess` extension has
+to match. Renaming the bridge project moves it, and the failure is a widget that installs
+perfectly and never connects. CI asserts the declared path resolves to a file in the package.
+
+**The bridge is published self-contained**, because the packaging project imposes that on
+`.NETCoreApp` references. That is the right answer here anyway: nothing in a sideloaded
+install can resolve a missing shared runtime, and a bridge that cannot start looks exactly
+like a bridge that cannot reach Discord. It costs roughly 33 MB of package size.
+
+Package identity — `Name` and `Publisher` — is unchanged from when the widget project built
+the package. That is what keeps an install an upgrade rather than a second, unrelated app,
+and keeps `widget.log` where it was.
+
 ## Distribution
 
-Sideload only, for two independent reasons:
-
-- Discord's `rpc` scope restriction, above
-- `runFullTrust` is a restricted capability requiring Microsoft Store onboarding review
-
-`APPX0006` at build time is Microsoft advising that a Windows Application Packaging Project
-should produce real sideload packages. See [the roadmap](roadmap.md).
+Sideload only. The reason is Discord's `rpc` scope restriction, above — not anything about
+the packaging.
 
 Packages are signed with a self-signed certificate whose subject must match the manifest
 `Publisher` exactly, as Windows renders it. Generate the certificate first and copy its
 rendered subject into the manifest, not the other way round — Windows canonicalises
 distinguished names, and a mismatch produces a package that builds and signs but will not
 install.
+
+An unpackaged registration blocks a packaged install of the same identity:
+`Add-AppxPackage` fails with `0x80073CFB`, *"the current user has already installed an
+unpackaged version of this app"*. Anyone who has deployed the widget project from Visual
+Studio has to `Remove-AppxPackage` before a release will install over it.
+
+### Microsoft Store
+
+Not viable, and the obstacle is not the one it first appears to be.
+
+**`runFullTrust` is not the blocker.** It is a restricted capability and needs justifying at
+submission, but launching a full-trust companion process is the standard Desktop Bridge
+pattern and is routinely approved.
+
+**The `rpc` scope is the blocker.** It is limited to the application owner plus a 50-slot
+tester allowlist. A Store customer authorizing a shipped application id is neither, so
+`AUTHORIZE` refuses them — the `4006 / not authorized` row in the README's troubleshooting
+table. A Store build with an id compiled in would work perfectly for the developer and fail
+for every single customer, which is the worst shape a defect can take: it passes local
+testing by construction.
+
+Injecting the id from a CI secret does not change this. It also does not make the id secret
+— it moves it from the repository into the shipped binary, where `strings` recovers it. The
+same reasoning already applied to the client secret applies here.
+
+**Reserving a Store name reassigns package identity.** Partner Center issues an
+`Identity/Name` such as `12345Publisher.AppName` and a `Publisher` of `CN=<GUID>`, and
+associating the project rewrites the manifest with them. That changes the
+PackageFamilyName, so a Store build and a sideload build are two unrelated apps: both can be
+installed at once, and Game Bar lists both widgets. If this is ever revisited, the Store
+identity belongs in a separate configuration rather than replacing the identity above.
+`Properties/DisplayName` must also match the reserved name exactly.
+
+**Naming.** A name that leads with someone else's trademark — *Xbox*, *Discord* — invites
+rejection and contradicts [the affiliation disclaimer](terms-of-service.md). A trailing
+descriptive "for X" is the conventional construction.
+
+What would unblock the Store is Discord approving general RPC access. Discord publishes no
+route to request it, and app verification, the path that looks like it should lead there,
+requires a Team — which [removes `rpc` entirely](roadmap.md#settled-users-supply-their-own-application-id).
