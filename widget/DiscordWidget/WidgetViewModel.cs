@@ -435,11 +435,28 @@ namespace DiscordWidget
         {
             if (_dispatcher.HasThreadAccess)
             {
-                action();
+                Guarded(action);
                 return;
             }
 
-            await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => action());
+            await _dispatcher.RunAsync(CoreDispatcherPriority.Normal, () => Guarded(action));
+        }
+
+        /// <summary>
+        /// Dispatcher callbacks have no caller to catch them, so an exception raised inside
+        /// one — including from a handler subscribed to a property change — reaches the app
+        /// as an unhandled crash rather than as a failed operation.
+        /// </summary>
+        private static void Guarded(Action action)
+        {
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                WidgetLog.Write("UI callback failed", ex);
+            }
         }
 
         private void Set<T>(ref T field, T value, [CallerMemberName] string name = null)

@@ -72,6 +72,7 @@
       <DependentUpon>VoiceWidget.xaml</DependentUpon>
     </Compile>
     <Compile Include="AppServiceSession.cs" />
+    <Compile Include="WidgetLog.cs" />
     <Compile Include="WidgetViewModel.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

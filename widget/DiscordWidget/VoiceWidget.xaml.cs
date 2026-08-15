@@ -60,9 +60,22 @@ namespace DiscordWidget
 
             if (inVoice)
             {
-                // The constructor throws if an activity with this id is already open.
-                if (_voiceActivity == null)
+                if (_voiceActivity != null) return;
+
+                try
+                {
                     _voiceActivity = new XboxGameBarWidgetActivity(_widget, VoiceActivityId);
+                }
+                catch (Exception ex)
+                {
+                    // Documented to throw when an activity with this id already exists,
+                    // which a fast leave-then-join can produce before Game Bar has released
+                    // the previous one. The activity only suppresses idle shutdown, so
+                    // losing it degrades behaviour rather than breaking the widget --
+                    // letting it escape a dispatcher callback would take the whole app down.
+                    _voiceActivity = null;
+                    WidgetLog.Write("Could not start Game Bar voice activity", ex);
+                }
             }
             else
             {
@@ -74,8 +87,20 @@ namespace DiscordWidget
         {
             if (_voiceActivity == null) return;
 
-            _voiceActivity.Complete();
-            _voiceActivity = null;
+            try
+            {
+                _voiceActivity.Complete();
+            }
+            catch (Exception ex)
+            {
+                WidgetLog.Write("Could not complete Game Bar voice activity", ex);
+            }
+            finally
+            {
+                // Cleared even on failure: retaining a dead activity would block every
+                // later attempt to start a new one.
+                _voiceActivity = null;
+            }
         }
 
         private async void OnToggleMute(object sender, RoutedEventArgs e)

@@ -30,6 +30,13 @@ namespace DiscordWidget
         public App()
         {
             InitializeComponent();
+
+            // Game Bar shows a generic load failure when a widget crashes, and WinRT
+            // exceptions surface with no usable stack, so record them before they are lost.
+            UnhandledException += (_, e) =>
+            {
+                WidgetLog.Write("Unhandled exception", e.Exception);
+            };
         }
 
         /// <summary>
