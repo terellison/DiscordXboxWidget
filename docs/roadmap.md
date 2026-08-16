@@ -51,26 +51,56 @@ by having the widget not work.
 This was briefly an open question — whether Discord's app verification would unlock general
 RPC access, letting a shipped application id serve everyone.
 
-Two independent findings closed it.
-
 **Terms.** Discord's Developer Terms §2(d) classify the Application ID as a developer
 credential and forbid embedding developer credentials in open source projects, so a built-in
-id would not be permissible even if verification granted the scope.
+id would not be permissible even if the scope were granted.
 
-**Verification actively breaks RPC.** App verification requires the application to belong to
-a Team, and a team-owned application cannot request the `rpc` scope at all — `AUTHORIZE`
-fails with `invalid_scope`. Measured directly, same Discord account, same machine, minutes
-apart:
+**Scale.** An unapproved application grants `rpc` only to accounts on its tester list, and
+[the documentation](https://docs.discord.com/developers/topics/rpc) caps that at 50:
+
+> We currently do not allow access to RPC for unapproved apps without being on the game's
+> list of testers.
+>
+> We grant 50 testing spots, which should be ample for development. After approval, this
+> restriction is removed.
+
+Fifty named accounts is not distribution. Each user registering their own application is,
+and it has the side benefit that people grant permissions to an application they own.
+
+### The ownership asymmetry, and a correction
+
+This project previously recorded that team-owned applications cannot use `rpc` at all, and
+that verification therefore excluded RPC. **That was wrong**, and the error is worth keeping
+because the measurement behind it looked convincing.
+
+What was measured, same account, same machine, minutes apart:
 
 | Application | `identify` | `rpc` |
 |---|---|---|
-| Team-owned (verification candidate) | allowed | **refused, `invalid_scope`** |
-| Personally owned | allowed | allowed |
+| Personally owned | granted | granted |
+| Team-owned, no testers added | granted | **refused, `invalid_scope`** |
+| Team-owned, authorizing account added as a tester | granted | granted |
 
-The documented precondition is that the `rpc` scope is available to "the application owner"
-plus a tester allowlist. Team ownership evidently stops the authorizing user counting as
-that owner. Nothing in Discord's documentation mentions the interaction.
+The third row was missing originally, and without it the refusal looked like a property of
+team ownership. It is not. The real behaviour is an asymmetry the documentation does not
+mention:
 
-So verification and RPC access are mutually exclusive for an app like this. **Do not move
-the application to a Team.** `Discord.Rpc.Harness scopetest <clientId>` reproduces the
-result in about a minute if this ever needs re-checking.
+- A **personally-owned** application grants `rpc` to its owner implicitly, with no tester
+  entry.
+- A **team-owned** application grants nobody implicit access. Every account, including team
+  members, must be on the tester list.
+
+So verification and RPC access are **not** mutually exclusive. A Team is fine, provided
+every user is explicitly added as a tester — which keeps the 50-account ceiling above, so it
+changes nothing about distribution.
+
+The lesson is about the shape of the evidence rather than Discord: two runs differing in one
+variable still only isolate that variable if the documented precondition is satisfied in
+both. It was not. `Discord.Rpc.Harness scopetest <clientId>` reproduces any row above in
+about a minute.
+
+### What would actually change this
+
+RPC approval — the "after approval, this restriction is removed" in the quote above.
+Discord's documentation states that approval exists but describes no way to request it. That
+single unanswered question is now the only thing between this and general distribution.

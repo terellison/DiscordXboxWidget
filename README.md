@@ -66,9 +66,10 @@ that you grant permissions to an application **you** own rather than to someone 
 4. Add `http://localhost` under **Redirects** and save
 5. Copy the **Application ID**
 
-> Keep the application under your own ownership. **Do not transfer it to a Team** — a
-> team-owned application is refused the `rpc` scope and the widget will report
-> `invalid_scope`.
+> Keeping the application under your own ownership is simplest — Discord grants an owner
+> access to their own application automatically. If you put it in a **Team**, that stops:
+> team-owned applications grant nobody access implicitly, and you must add yourself under
+> **App Testers** or authorization fails with `invalid_scope`.
 
 ![The OAuth2 tab with Public Client enabled and the localhost redirect added](docs/images/discord-oauth2-setup.png)
 
@@ -120,7 +121,7 @@ Get-ChildItem "$env:LOCALAPPDATA\Packages\DiscordXboxWidget_*\LocalState\widget.
 | `0x80073CFB` on install | A build deployed from Visual Studio is registered. `Remove-AppxPackage` it first — an unpackaged registration cannot be replaced by a packaged one |
 | "No Discord application configured" | Step 4 — set the Application ID via the gear |
 | `invalid_client` during authorization | **Public Client** not enabled on your app's OAuth2 tab |
-| `invalid_scope` during authorization | The application belongs to a Team; `rpc` requires personal ownership |
+| `invalid_scope` during authorization | The application is in a Team and your account is not under **App Testers**. Team-owned apps grant no implicit access, even to their own team |
 | 4006 / not authorized | The Discord account in use does not own the application from step 3 |
 | Widget missing from the Win+G menu | Package not installed, or Game Bar needs restarting |
 | Empty participant list | Discord desktop client is not running |

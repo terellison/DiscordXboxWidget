@@ -105,11 +105,12 @@ which is how the local participant is identified in the list.
 Dropping to `rpc.voice.read` + `rpc.voice.write` alone is possible only by giving up channel
 navigation — the case `SessionCapabilities.ChannelNavigation` isolates.
 
-> **The application must be personally owned, not team-owned.** A team-owned application is
-> refused the `rpc` scope outright: `AUTHORIZE` returns `invalid_scope`, while `identify`
-> from the same account on the same application succeeds. Since app verification requires a
-> Team, verification and RPC access cannot both be had. This is undocumented; see
-> [the roadmap](roadmap.md#settled-users-supply-their-own-application-id) for the measurements.
+> **A team-owned application grants nobody `rpc` implicitly.** A personally-owned
+> application grants it to its owner with no tester entry; a team-owned one refuses every
+> account — team members included — with `invalid_scope` until that account is added to the
+> application's tester list. Neither half of that asymmetry is documented. A Team is
+> otherwise fine, so verification and RPC access can be held together; see
+> [the roadmap](roadmap.md#the-ownership-asymmetry-and-a-correction) for the measurements.
 
 ### No client secret
 
@@ -222,6 +223,8 @@ identity belongs in a separate configuration rather than replacing the identity 
 rejection and contradicts [the affiliation disclaimer](terms-of-service.md). A trailing
 descriptive "for X" is the conventional construction.
 
-What would unblock the Store is Discord approving general RPC access. Discord publishes no
-route to request it, and app verification, the path that looks like it should lead there,
-requires a Team — which [removes `rpc` entirely](roadmap.md#settled-users-supply-their-own-application-id).
+What would unblock the Store is Discord approving general RPC access, which lifts the
+50-tester ceiling. The documentation says approval exists and describes no way to request
+it. Verification is a separate programme and would not help: it requires a Team, which is
+[compatible with RPC](roadmap.md#the-ownership-asymmetry-and-a-correction) but does nothing
+about the ceiling.
