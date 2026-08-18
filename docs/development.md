@@ -68,7 +68,7 @@ type 2, and the default-avatar rules for both account systems.
 ## Talking to Discord directly
 
 The harness connects to the local Discord client without any packaging or Game Bar involved.
-`probe` and `wsprobe` need no registered application; the rest need an application id.
+`probe` needs no registered application; the rest need an application id.
 
 ```bash
 dotnet run --project src/Discord.Rpc.Harness -- watch <clientId>
@@ -77,7 +77,6 @@ dotnet run --project src/Discord.Rpc.Harness -- watch <clientId>
 | Mode | Purpose |
 |---|---|
 | `probe` | Named pipe framing |
-| `wsprobe <id>` | WebSocket framing — a dead end for the widget, see [architecture](architecture.md) |
 | `handshake <id>` | Auth; prints granted capabilities |
 | `watch <id>` | Live channel, participants, speaking events |
 | `toggle <id>` | `SET_VOICE_SETTINGS` round trip, restores afterwards |

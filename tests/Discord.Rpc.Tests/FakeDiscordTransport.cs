@@ -22,8 +22,6 @@ internal sealed class FakeDiscordTransport : IDiscordTransport
     /// <summary>Every payload the session sent, in order.</summary>
     public List<string> Sent { get; } = new();
 
-    public bool RequiresHandshakeFrame { get; init; } = true;
-
     /// <summary>Scopes the fake reports back from AUTHENTICATE.</summary>
     public string[] GrantedScopes { get; init; } = { "rpc", "identify" };
 

@@ -128,13 +128,13 @@ public class BridgePayloadsTests
     public void State_CarriesTheDetailThatExplainsAFailure()
     {
         var json = BridgePayloads.WriteState(
-            SessionState.Disconnected, "WebSocket closed (code 4001): Invalid Origin",
+            SessionState.Disconnected, "No Discord IPC pipe found (checked discord-ipc-0 through discord-ipc-9).",
             SessionCapabilities.None, null);
 
         BridgePayloads.ReadState(json, out var state, out var detail, out _, out _);
 
         Assert.Equal(SessionState.Disconnected, state);
-        Assert.Equal("WebSocket closed (code 4001): Invalid Origin", detail);
+        Assert.Equal("No Discord IPC pipe found (checked discord-ipc-0 through discord-ipc-9).", detail);
     }
 
     [Fact]

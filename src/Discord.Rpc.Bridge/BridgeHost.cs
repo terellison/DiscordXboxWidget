@@ -43,8 +43,8 @@ internal sealed class BridgeHost : IDisposable
 
     private async Task ConnectSessionAsync(CancellationToken cancellationToken)
     {
-        // Named pipe, not WebSocket: the bridge runs outside the AppContainer precisely so
-        // it can use the transport the widget cannot.
+        // The bridge runs outside the AppContainer precisely so it can open the named pipe,
+        // which is the whole reason it exists (see BridgeProtocol).
         _session = new DiscordRpcSession(
             _clientId!,
             new DpapiTokenProvider(_clientId!),
