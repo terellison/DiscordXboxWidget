@@ -20,14 +20,12 @@ namespace Discord.Rpc.Transport
     /// "This functionality is not supported in the context of an app container".
     /// The Game Bar docs list named pipes as a supported IPC option, but
     /// https://github.com/microsoft/XboxGameBarSamples/issues/44 records that they are not.
-    /// Use <see cref="WebSocketTransport"/> from the widget; this type is for the console
-    /// harness and any future full-trust component.
+    /// The widget therefore does not connect to Discord at all: the full-trust bridge does,
+    /// using this transport, and the widget talks to the bridge over AppServiceConnection.
     /// </remarks>
     public sealed class NamedPipeTransport : IDiscordTransport
     {
         private const int MaxPipeIndex = 9;
-
-        public bool RequiresHandshakeFrame => true;
 
         private readonly SemaphoreSlim _writeLock = new SemaphoreSlim(1, 1);
         private NamedPipeClientStream? _pipe;

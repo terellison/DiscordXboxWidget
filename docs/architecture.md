@@ -21,7 +21,7 @@ DiscordXboxWidget.msix
 
 | Project | Target | Role |
 |---|---|---|
-| `Discord.Rpc` | netstandard2.0 | Protocol, transports, session, bridge payloads |
+| `Discord.Rpc` | netstandard2.0 | Protocol, named-pipe transport, session, bridge payloads |
 | `Discord.Rpc.Bridge` | net9.0-windows | Full-trust host that actually talks to Discord |
 | `Discord.Rpc.Harness` | net9.0 | Console rig for probing Discord directly |
 | `DiscordWidget` | UWP | The Game Bar widget itself |
@@ -44,7 +44,8 @@ an AppContainer *can* reach given a loopback exemption. It closes the connection
 **4001 Invalid Origin**, validating the `Origin` header against the application's
 `rpc_origins` allowlist — a field the developer portal no longer exposes. With that list
 empty no header value succeeds, including sending none. Verified against no `Origin`,
-`https://discord.com` and `https://localhost`.
+`https://discord.com` and `https://localhost`. The WebSocket transport that established this
+has since been deleted — the finding is recorded here, not kept alive as unused code.
 
 So a full-trust process outside the container performs the RPC, and the widget talks to it
 over `AppServiceConnection`.

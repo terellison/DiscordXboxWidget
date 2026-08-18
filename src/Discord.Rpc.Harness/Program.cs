@@ -23,10 +23,6 @@ try
             await ProbeAsync(cts.Token);
             break;
 
-        case "wsprobe":
-            await WebSocketProbeAsync(RequireClientId(args), cts.Token);
-            break;
-
         case "handshake":
             await HandshakeAsync(RequireClientId(args), cts.Token);
             break;
@@ -56,7 +52,7 @@ try
             break;
 
         default:
-            Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | wsprobe | handshake | watch | toggle");
+            Console.Error.WriteLine($"Unknown mode '{mode}'. Expected: probe | handshake | watch | toggle");
             return 2;
     }
 
@@ -105,28 +101,6 @@ static async Task ProbeAsync(CancellationToken ct)
     Console.WriteLine($"      {reply.Value.Payload}");
     Console.WriteLine();
     Console.WriteLine("Framing works: Discord read our header, parsed the JSON, and replied in kind.");
-}
-
-// Verifies the transport the UWP widget will actually use. Runs unrestricted here;
-// inside an AppContainer the same code additionally needs a loopback exemption.
-static async Task WebSocketProbeAsync(string clientId, CancellationToken ct)
-{
-    using var transport = new WebSocketTransport(clientId);
-
-    var sw = Stopwatch.StartNew();
-    await transport.ConnectAsync(ct);
-    Console.WriteLine($"[ok]  connected to ws://127.0.0.1:{transport.ConnectedPort} in {sw.ElapsedMilliseconds}ms");
-
-    // No handshake frame: the client ID was supplied in the query string.
-    var reply = await transport.ReceiveAsync(ct);
-    if (reply == null)
-    {
-        Console.WriteLine("[!!]  socket closed with no reply");
-        return;
-    }
-
-    Console.WriteLine($"[ok]  received {reply.Value.Opcode} frame, {reply.Value.Payload.Length} bytes");
-    Console.WriteLine($"      {Truncate(reply.Value.Payload, 400)}");
 }
 
 static string Truncate(string value, int max) =>
