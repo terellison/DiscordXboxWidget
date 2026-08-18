@@ -7,7 +7,6 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Discord.Rpc;
-using Discord.Rpc.Transport;
 using Windows.UI.Core;
 
 namespace DiscordWidget
