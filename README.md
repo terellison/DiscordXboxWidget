@@ -1,7 +1,7 @@
 # DiscordXboxWidget
 
 Discord voice controls inside the Xbox Game Bar. See who's in your channel, who's talking,
-mute and deafen yourself, and hop between channels — without alt-tabbing out of a game.
+mute and deafen yourself, and hop between channels directly from the Game Bar. Controllers are fully supported, so no more awkwardly switching between controller and mouse or Alt tabbing.
 
 ![The widget open in Game Bar, showing a voice channel with participants and a speaking indicator](docs/images/hero.png)
 
