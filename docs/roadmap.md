@@ -99,8 +99,32 @@ variable still only isolate that variable if the documented precondition is sati
 both. It was not. `Discord.Rpc.Harness scopetest <clientId>` reproduces any row above in
 about a minute.
 
-### What would actually change this
+### Asked and answered: RPC approval is not available
 
-RPC approval — the "after approval, this restriction is removed" in the quote above.
-Discord's documentation states that approval exists but describes no way to request it. That
-single unanswered question is now the only thing between this and general distribution.
+The documentation's "after approval, this restriction is removed" implies a route to general
+RPC access. There is no such route. Discord Developer Support, ticket 67738351, 19 August
+2026:
+
+> Unfortunately, we are unable to grant your app the `rpc` OAuth2 scope. This scope is listed
+> in the documentation for completeness' sake, but please bear in mind that these scopes are
+> not usually granted, and that the functionality they enable is not intended to be readily
+> available.
+
+A follow-up asking whether any realistic path existed to distribute the app without each user
+registering their own application was answered with "we don't have any additional actions we
+can take to move this forward", and the ticket was closed.
+
+So this is settled by policy rather than by anything in the project. `rpc` is deliberately not
+generally available, and no amount of verification, packaging or Store work changes that.
+
+### What that leaves
+
+Two distribution models, and the one already shipped is the one that scales:
+
+- **Each user registers their own application.** No ceiling — every user is the owner of their
+  own application and gets `rpc` implicitly. Costs them a two-minute setup.
+- **A single shipped application id.** Capped at 50 named testers, forever, and prohibited by
+  Developer Terms §2(d) for an open source project anyway.
+
+The 50-tester limit is often quoted as this project's reach. It is not: it is the limit of the
+model this project does not use.

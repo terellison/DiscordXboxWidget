@@ -140,9 +140,10 @@ for two independent reasons that happen to agree:
   §2(d) name the Application ID as a developer credential and state that developer
   credentials **may not be embedded in open source projects**. A built-in default would
   breach that regardless of whether it functioned.
-- It would mostly not function anyway. The `rpc` scope is restricted to an application's
-  owner plus a 50-slot tester allowlist unless approved for general RPC access, and Discord
-  publishes no way to request that approval.
+- It would mostly not function anyway. The `rpc` scope reaches an application's owner plus a
+  50-slot tester allowlist, and no further: Discord Developer Support has confirmed the scope
+  is not granted for general use. A shipped id would work for the author and 50 named
+  accounts.
 
 The bridge writes a template on first run and reports the reason through the AppService, so
 an unconfigured install explains itself in the widget rather than failing silently.
@@ -224,8 +225,10 @@ identity belongs in a separate configuration rather than replacing the identity 
 rejection and contradicts [the affiliation disclaimer](terms-of-service.md). A trailing
 descriptive "for X" is the conventional construction.
 
-What would unblock the Store is Discord approving general RPC access, which lifts the
-50-tester ceiling. The documentation says approval exists and describes no way to request
-it. Verification is a separate programme and would not help: it requires a Team, which is
+Nothing will unblock the Store. General RPC access is the only thing that would, and Discord
+Developer Support has confirmed directly that it is not granted: the scope is documented
+"for completeness' sake" and the functionality "is not intended to be readily available".
+[The roadmap](roadmap.md#asked-and-answered-rpc-approval-is-not-available) quotes the reply
+in full. Verification would not help either — it requires a Team, which is
 [compatible with RPC](roadmap.md#the-ownership-asymmetry-and-a-correction) but does nothing
-about the ceiling.
+about the tester ceiling.
