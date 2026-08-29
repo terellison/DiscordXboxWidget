@@ -1,3 +1,27 @@
+# Elevator Pitch
+## Problem
+Xbox Mode forces every app into full screen mode and seems to suspend processes that the desktop experience relies on. Alt-tabbing out of a game to use Discord while in Xbox Mode results in flickering and apps becoming unresponsive. On top of that, on an ultrawide display like mine apps get really stretched out in full screen mode.
+
+Additionally, having to switch to my mouse to control Discord kind of brokr the "use your PC as an Xbox" experience for me. It's like that same itch a programmer has to use the keyboard for everything - having to switch from the controller to the mouse, alt-tabbing, floating around the UI with my mouse for a few seconds until I get my bearings, etc... I just wanna game, and it wastes time
+
+## Solution
+This widget adds basic Discord control to the Xbox Game Bar, which includes:
+- Mute / unmute
+- Deafen
+- Leave / Switch channels
+Since this hooks into the game bar, navigating with a controller works great. This widget lets you stay in your game / xbox mode so you don't have to put the controller down.
+
+## Security
+This app runs ***completely locally*** on your computer and ***requires*** the Discord desktop app in order to work. Communication with the Discord app is done via Remote Procedure Calls (RPC) between the widget and the Discord app using a bridge process. The bridge process is needed because when UWP apps use named pipes, it is under a different set of privileges due to the way UWP containerizes apps. The widget uses an app service connection in full trust mode to the bridge, and the bridge makes the RPCs on our behalf using the named pipe just as any other desktop app would. My testing across gaming sessions showed zero input latency between the widget and the discord app. Only the widget can talk to the bridge, and vice verse. For more technical details, see [the docs](docs/architecture.md)
+
+<hr/>
+
+**Disclaimer:** Much of the text (aka everything outside of this elevator pitch section) and code in this repository was written by Antrhopic's Claude Code, using Fable 5 during the ideation and high-level feasibility research portion, and Opus 5 during actual implementation. I started this idea out of frustration on a gaming night, and as such didn't want to spend a lot of time writing code. I did learn a *ton* about RPC, named pipes, and UWP. (still not a huge fan of it, but this learning experience made me appreciate it a bit more. Win32 FTW though!) **All code has been reviewed, tested, and signed off by me.** Claude, take it away!
+
+\- *Terry Ellison*
+
+<hr/>
+
 # DiscordXboxWidget
 
 Discord voice controls inside the Xbox Game Bar. See who's in your channel, who's talking,
