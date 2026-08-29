@@ -14,9 +14,9 @@ Since this hooks into the game bar, navigating with a controller works great. Th
 ## Security
 This app runs ***completely locally*** on your computer and ***requires*** the Discord desktop app in order to work. Communication with the Discord app is done via Remote Procedure Calls (RPC) between the widget and the Discord app using a bridge process. The bridge process is needed because when UWP apps use named pipes, it is under a different set of privileges due to the way UWP containerizes apps. The widget uses an app service connection in full trust mode to the bridge, and the bridge makes the RPCs on our behalf using the named pipe just as any other desktop app would. My testing across gaming sessions showed zero input latency between the widget and the discord app. Only the widget can talk to the bridge, and vice verse. For more technical details, see [the docs](docs/architecture.md)
 
-<hr/>
+## Disclaimer
 
-**Disclaimer:** Much of the text (aka everything outside of this elevator pitch section) and code in this repository was written by Antrhopic's Claude Code, using Fable 5 during the ideation and high-level feasibility research portion, and Opus 5 during actual implementation. I started this idea out of frustration on a gaming night, and as such didn't want to spend a lot of time writing code. I did learn a *ton* about RPC, named pipes, and UWP. (still not a huge fan of it, but this learning experience made me appreciate it a bit more. Win32 FTW though!) **All code has been reviewed, tested, and signed off by me.** Claude, take it away!
+Much of the text (aka everything outside of this elevator pitch section) and code in this repository was written by Anthropic's Claude Code, using Fable 5 during the ideation and high-level feasibility research portion, and Opus 5 during actual implementation. I started this idea out of frustration on a gaming night, and as such didn't want to spend a lot of time writing code. I did learn a *ton* about RPC, named pipes, and UWP. (still not a huge fan of it, but this learning experience made me appreciate it a bit more. Win32 FTW though!) **All code has been reviewed, tested, and signed off by me.** Claude, take it away!
 
 \- *Terry Ellison*
 
