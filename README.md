@@ -9,6 +9,7 @@ This widget adds basic Discord control to the Xbox Game Bar, which includes:
 - Mute / unmute
 - Deafen
 - Leave / Switch channels
+
 Since this hooks into the game bar, navigating with a controller works great. This widget lets you stay in your game / xbox mode so you don't have to put the controller down.
 
 ## Security
